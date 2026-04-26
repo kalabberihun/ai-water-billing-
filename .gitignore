@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+db.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Private keys / Secrets
+secrets/
+*.pem
+*.key
+
+# Build outputs
+build/
+dist/
+out/
+
+# IDE files
+.vscode/
+.idea/
