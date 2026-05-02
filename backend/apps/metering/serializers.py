@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Meter, MeterReading, MaintenanceTask
+from .models import Meter, MeterReading, MaintenanceTask, LeakageReport
 
 class MeterSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,3 +34,24 @@ class MaintenanceTaskSerializer(serializers.ModelSerializer):
         fields = ['id', 'meter', 'meter_number', 'customer_name', 'assigned_to', 'tech_name', 
                   'issue_description', 'status', 'created_at', 'resolved_at', 'resolution_notes']
         read_only_fields = ['id', 'created_at', 'resolved_at']
+
+
+class LeakageReportSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.user.get_full_name', read_only=True)
+    customer_email = serializers.CharField(source='customer.user.email', read_only=True)
+    meter_number = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LeakageReport
+        fields = [
+            'id', 'customer', 'customer_name', 'customer_email',
+            'meter', 'meter_number', 'location_description',
+            'urgency', 'description', 'status', 'admin_notes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'customer', 'status', 'admin_notes', 'created_at', 'updated_at']
+
+    def get_meter_number(self, obj):
+        if obj.meter:
+            return obj.meter.meter_number
+        return None

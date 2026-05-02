@@ -32,12 +32,14 @@ const Sidebar = () => {
             { path: '/admin/maintenance', label: 'Field Maintenance', icon: '🔧' },
             { path: '/admin/roles', label: 'Role Management', icon: '👥' },
             { path: '/admin/system', label: 'System Management', icon: '⚙️' },
+            { path: '/admin/leakage-reports', label: 'Leakage Reports', icon: '🚰' },
         ];
     } else {
         navItems = [
             { path: '/dashboard', label: 'Dashboard', icon: '📊' },
             { path: '/readings', label: 'Meter Readings', icon: '🔍' },
             { path: '/bills', label: 'Bills & Payments', icon: '💳' },
+            { path: '/report-leakage', label: 'Report Leakage', icon: '🚰' },
         ];
     }
 

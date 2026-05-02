@@ -170,7 +170,6 @@ class VerifyReadingView(APIView):
 
 
 from django.utils import timezone
-from django.core.mail import send_mail
 
 class AdminBatchAssignReviewsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -205,13 +204,29 @@ class AdminBatchAssignReviewsView(APIView):
             assigned_count += len(readings_to_assign)
             clerk_count += 1
             
-            # Send Email
+            # Send Email and Notification
+            from utils.email import send_html_email
+            from apps.accounts.models import SystemNotification
+            
+            msg = f"You have been newly assigned {len(readings_to_assign)} meter readings to review. Please check your dashboard."
+            
+            SystemNotification.objects.create(
+                user=clerk,
+                alert_type='TASK',
+                message=msg
+            )
+            
             try:
-                send_mail(
-                    'New Meter Readings Assigned',
-                    f'Hello {clerk.first_name},\n\nYou have been newly assigned {len(readings_to_assign)} meter readings to review. Please check your dashboard.',
-                    'noreply@aiwaterbilling.com',
-                    [clerk.email],
+                send_html_email(
+                    subject='New Meter Readings Assigned',
+                    template_name='emails/task_assigned.html',
+                    context={
+                        'name': clerk.first_name or 'Clerk',
+                        'task_type': 'batch of meter readings',
+                        'meter_number': 'Multiple Meters',
+                        'message': msg
+                    },
+                    recipient_list=[clerk.email],
                     fail_silently=True,
                 )
             except Exception as e:
@@ -279,6 +294,42 @@ class AdminMaintenanceTaskView(APIView):
             meter = task.meter
             meter.status = 'MAINTENANCE'
             meter.save()
+            
+            # Send Email & Notification
+            if task.assigned_to:
+                from apps.accounts.models import SystemNotification
+                from utils.email import send_html_email
+                
+                msg = f"A new maintenance task has been assigned for Meter {meter.meter_number}."
+                
+                SystemNotification.objects.create(
+                    user=task.assigned_to,
+                    alert_type='TASK',
+                    message=msg
+                )
+                
+                customer_name = None
+                if meter.customer and hasattr(meter.customer, 'user') and meter.customer.user:
+                    customer_name = f"{meter.customer.user.first_name} {meter.customer.user.last_name}".strip()
+                
+                try:
+                    send_html_email(
+                        subject='Maintenance Task Assigned',
+                        template_name='emails/task_assigned.html',
+                        context={
+                            'name': task.assigned_to.first_name or 'Technician',
+                            'task_type': 'maintenance task',
+                            'meter_number': meter.meter_number,
+                            'customer_name': customer_name,
+                            'address': meter.installation_address,
+                            'message': f"{msg} Issue: {task.issue_description}"
+                        },
+                        recipient_list=[task.assigned_to.email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+                    
             return Response(MaintenanceTaskSerializer(task).data, status=201)
         return Response(serializer.errors, status=400)
 
@@ -326,3 +377,154 @@ class TechnicianMaintenanceTaskView(APIView):
             
         task.save()
         return Response(MaintenanceTaskSerializer(task).data)
+
+
+# ─── Leakage Report Views ──────────────────────────────────────────────────
+
+class CustomerLeakageReportView(APIView):
+    """Customers can submit and view their own leakage reports."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, 'customer'):
+            return Response({'error': 'Customer profile required'}, status=400)
+        
+        from .models import LeakageReport
+        from .serializers import LeakageReportSerializer
+        reports = LeakageReport.objects.filter(customer=request.user.customer)
+        return Response(LeakageReportSerializer(reports, many=True).data)
+
+    def post(self, request):
+        if not hasattr(request.user, 'customer'):
+            return Response({'error': 'Only customers can report leakages'}, status=403)
+        
+        from .models import LeakageReport
+        from .serializers import LeakageReportSerializer
+        
+        serializer = LeakageReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report = serializer.save(customer=request.user.customer)
+        
+        # Send confirmation email
+        from utils.email import send_html_email
+        from apps.accounts.models import SystemNotification
+        
+        msg = f"Your leakage report has been submitted successfully. Our team will investigate soon. Urgency: {report.urgency}."
+        
+        SystemNotification.objects.create(
+            user=request.user,
+            alert_type='INFO',
+            message=msg
+        )
+        
+        try:
+            send_html_email(
+                subject='Leakage Report Received - AquaBill AI',
+                template_name='emails/notification.html',
+                context={
+                    'name': request.user.first_name or 'Customer',
+                    'message': f"Thank you for reporting a water leakage. Your report (#{str(report.id)[:8]}) has been received and our team will investigate shortly.\n\nLocation: {report.location_description}\nUrgency: {report.get_urgency_display()}\n\nWe will notify you once action has been taken."
+                },
+                recipient_list=[request.user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+        
+        return Response(LeakageReportSerializer(report).data, status=201)
+
+
+class AdminLeakageReportView(APIView):
+    """Admin view: list all reports and update their status."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        from .models import LeakageReport
+        from .serializers import LeakageReportSerializer
+        reports = LeakageReport.objects.all().select_related('customer__user', 'meter')
+        return Response(LeakageReportSerializer(reports, many=True).data)
+
+    def patch(self, request, report_id):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        from .models import LeakageReport
+        from .serializers import LeakageReportSerializer
+        
+        try:
+            report = LeakageReport.objects.select_related('customer__user').get(id=report_id)
+        except LeakageReport.DoesNotExist:
+            return Response({'error': 'Report not found'}, status=404)
+        
+        new_status = request.data.get('status')
+        admin_notes = request.data.get('admin_notes')
+        technician_id = request.data.get('technician_id')
+        
+        allowed = ['UNDER_REVIEW', 'DISPATCHED', 'RESOLVED']
+        if new_status and new_status not in allowed:
+            return Response({'error': f'Status must be one of: {allowed}'}, status=400)
+            
+        if new_status == 'DISPATCHED' and report.status != 'DISPATCHED':
+            if not technician_id:
+                return Response({'error': 'technician_id is required when dispatching a report'}, status=400)
+            
+            from apps.metering.models import MaintenanceTask
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
+            try:
+                technician = User.objects.get(id=technician_id, role__name__iexact='TECHNICIAN')
+            except User.DoesNotExist:
+                return Response({'error': 'Invalid technician ID'}, status=400)
+                
+            MaintenanceTask.objects.create(
+                meter=report.meter,
+                assigned_to=technician,
+                issue_description=f"Leakage Report #{str(report.id)[:8]}\nLocation: {report.location_description}\nDescription: {report.description}",
+                status='PENDING'
+            )
+        
+        if new_status:
+            report.status = new_status
+        if admin_notes is not None:
+            report.admin_notes = admin_notes
+        report.save()
+        
+        # Notify customer of status change
+        if new_status:
+            from apps.accounts.models import SystemNotification
+            from utils.email import send_html_email
+            
+            status_messages = {
+                'UNDER_REVIEW': 'Your leakage report is now under review by our team.',
+                'DISPATCHED': 'A technician has been dispatched to investigate your reported leakage.',
+                'RESOLVED': 'Your leakage report has been resolved. Thank you for reporting!'
+            }
+            msg = status_messages.get(new_status, f'Your leakage report status has been updated to {new_status}.')
+            
+            SystemNotification.objects.create(
+                user=report.customer.user,
+                alert_type='INFO',
+                message=msg
+            )
+            
+            try:
+                send_html_email(
+                    subject=f'Leakage Report Update - {new_status.replace("_", " ").title()}',
+                    template_name='emails/notification.html',
+                    context={
+                        'name': report.customer.user.first_name or 'Customer',
+                        'message': msg + (f'\n\nAdmin Notes: {admin_notes}' if admin_notes else '')
+                    },
+                    recipient_list=[report.customer.user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+        
+        return Response(LeakageReportSerializer(report).data)

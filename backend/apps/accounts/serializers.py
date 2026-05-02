@@ -1,12 +1,12 @@
 from rest_framework import serializers
-from .models import User, Customer, Role
+from .models import User, Customer, Role, SystemNotification
 
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.SlugRelatedField(slug_field='name', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'created_at']
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'is_email_verified', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -65,3 +65,17 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     uidb64 = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(min_length=8)
+
+class VerifyEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6, min_length=6)
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class SystemNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemNotification
+        fields = ['id', 'alert_type', 'message', 'is_read', 'created_at']
+        read_only_fields = ['id', 'created_at']
+

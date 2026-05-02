@@ -80,13 +80,27 @@ def generate_bill(self, reading_id):
             )
             
             # Send Email Notification
-            from django.core.mail import send_mail
-            from django.conf import settings
+            from utils.email import send_html_email
+            from apps.accounts.models import SystemNotification
+            
+            msg = f"Your new water bill for {bill.total_amount} ETB has been generated. Due Date: {bill.due_date}"
+            
+            SystemNotification.objects.create(
+                user=bill.customer.user,
+                alert_type='INFO',
+                message=msg
+            )
+            
             try:
-                send_mail(
+                send_html_email(
                     subject=f"New Water Bill Generated - {bill.created_at.strftime('%B %Y')}",
-                    message=f"Hello {bill.customer.user.first_name},\n\nYour new water bill for {bill.total_amount} ETB has been generated.\nDue Date: {bill.due_date}\n\nPlease log in to view and pay your bill.\n\nThank you,\nWater Billing System",
-                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    template_name='emails/bill_generated.html',
+                    context={
+                        'customer_name': bill.customer.user.first_name or 'Customer',
+                        'meter_number': bill.reading.meter.meter_number,
+                        'amount': str(bill.total_amount),
+                        'due_date': bill.due_date.strftime('%B %d, %Y')
+                    },
                     recipient_list=[bill.customer.user.email],
                     fail_silently=True,
                 )

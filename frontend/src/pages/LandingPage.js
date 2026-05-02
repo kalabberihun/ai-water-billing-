@@ -87,6 +87,7 @@ const LandingLayout = ({ children }) => {
                             <h4>Account</h4>
                             <Link to="/login">Login</Link>
                             <Link to="/register">Sign Up</Link>
+                            <Link to="/about">Support</Link>
                         </div>
                     </div>
                 </div>

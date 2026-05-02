@@ -30,12 +30,40 @@ def detect_usage_anomaly(sender, instance, created, **kwargs):
                     f"Your normal average is {float(avg_usage):.2f} m³. Please check for potential leaks."
                 )
                 
+                alert_type = 'LEAK' if current_usage > threshold * 1.5 else 'SPIKE'
                 WaterAlert.objects.create(
                     customer=customer,
                     bill=instance,
-                    alert_type='LEAK' if current_usage > threshold * 1.5 else 'SPIKE',
+                    alert_type=alert_type,
                     message=message
                 )
+                
+                # Also create system notification and send email
+                from apps.accounts.models import SystemNotification
+                from utils.email import send_html_email
+                
+                SystemNotification.objects.create(
+                    user=customer.user,
+                    alert_type=alert_type,
+                    message=message
+                )
+                
+                try:
+                    send_html_email(
+                        subject='Important: Unusual Water Usage Detected',
+                        template_name='emails/anomaly_alert.html',
+                        context={
+                            'customer_name': customer.user.first_name or 'Customer',
+                            'meter_number': instance.reading.meter.meter_number,
+                            'alert_type': 'Potential Leak' if alert_type == 'LEAK' else 'Unusual Spike',
+                            'message': message
+                        },
+                        recipient_list=[customer.user.email],
+                        fail_silently=True
+                    )
+                except Exception as e:
+                    print(f"Failed to send anomaly email: {e}")
+                    
         elif not avg_usage:
             # First bill or no previous consumption data, skip analysis
             pass

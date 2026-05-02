@@ -33,6 +33,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    is_email_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -82,3 +83,46 @@ class AuditLog(models.Model):
             models.Index(fields=['entity_type', 'entity_id']),
             models.Index(fields=['created_at']),
         ]
+
+class SystemNotification(models.Model):
+    ALERT_TYPES = [
+        ('LEAK', 'Potential Leak'),
+        ('SPIKE', 'Unusual Usage Spike'),
+        ('INFO', 'Information'),
+        ('WARNING', 'Warning'),
+        ('TASK', 'Task Assigned'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    alert_type = models.CharField(max_length=20, choices=ALERT_TYPES, default='INFO')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'system_notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.alert_type} Notification for {self.user.email}"
+
+
+class EmailVerification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='email_verifications')
+    otp_code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'email_verifications'
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"OTP for {self.user.email} ({'used' if self.is_used else 'active'})"

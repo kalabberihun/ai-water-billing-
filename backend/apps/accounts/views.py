@@ -1,3 +1,4 @@
+import random
 from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,18 +11,55 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from django.conf import settings as django_settings
 from django.contrib.auth.hashers import make_password, check_password
+from django.utils import timezone
 
-from .models import User, Customer, Role
+from .models import User, Customer, Role, EmailVerification
 from .serializers import (
     UserSerializer, CustomerSerializer, RegisterSerializer,
-    LoginSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+    LoginSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    SystemNotificationSerializer, VerifyEmailSerializer, ResendOTPSerializer
 )
 from .authentication import generate_tokens
 
-from django.core.mail import send_mail
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
+
+from utils.email import send_html_email
+
+
+def _generate_otp():
+    """Generate a random 6-digit OTP code."""
+    return f"{random.randint(100000, 999999)}"
+
+
+def _send_otp_email(user, otp_code):
+    """Send the OTP verification email."""
+    send_html_email(
+        subject='Verify Your Email - AquaBill AI',
+        template_name='emails/otp_verification.html',
+        context={
+            'user': user,
+            'otp_code': otp_code
+        },
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+def _create_and_send_otp(user):
+    """Create an OTP record and send it via email. Returns the OTP object."""
+    # Invalidate any previous unused OTPs
+    EmailVerification.objects.filter(user=user, is_used=False).update(is_used=True)
+
+    otp_code = _generate_otp()
+    otp = EmailVerification.objects.create(
+        user=user,
+        otp_code=otp_code,
+        expires_at=timezone.now() + timedelta(minutes=10),
+    )
+    _send_otp_email(user, otp_code)
+    return otp
 
 
 # ─── Admin-only permission helper ─────────────────────────────────────────────
@@ -43,14 +81,16 @@ class RegisterView(APIView):
         data = serializer.validated_data
         
         with transaction.atomic():
-            # Create user
+            # Create user — inactive until email is verified
             password_hash = make_password(data['password'])
             
             user = User.objects.create(
                 email=data['email'],
                 first_name=data.get('first_name', ''),
                 last_name=data.get('last_name', ''),
-                password=password_hash
+                password=password_hash,
+                is_active=False,
+                is_email_verified=False,
             )
             
             # Create customer profile
@@ -68,10 +108,15 @@ class RegisterView(APIView):
             meter.customer = customer
             meter.save()
         
-        tokens = generate_tokens(user)
+        # Send OTP verification email
+        try:
+            _create_and_send_otp(user)
+        except Exception as e:
+            print(f"Error sending OTP email: {e}")
+        
         return Response({
-            'user': UserSerializer(user).data,
-            **tokens
+            'message': 'Account created! Please check your email for a verification code.',
+            'email': user.email,
         }, status=status.HTTP_201_CREATED)
 
 class LoginView(APIView):
@@ -90,6 +135,17 @@ class LoginView(APIView):
             return Response(
                 {'error': 'No account exists with this email address.'}, 
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Block unverified users
+        if not user.is_email_verified:
+            return Response(
+                {
+                    'error': 'Please verify your email address before logging in.',
+                    'email_not_verified': True,
+                    'email': user.email,
+                },
+                status=status.HTTP_403_FORBIDDEN
             )
         
         # Check password with legacy fallback
@@ -343,10 +399,10 @@ class PasswordResetRequestView(APIView):
 
                 # Send email
                 try:
-                    send_mail(
+                    send_html_email(
                         subject='Password Reset - AquaBill AI',
-                        message=f'You requested a password reset. Please click the link below to set a new password:\n\n{reset_link}\n\nIf you did not request this, please ignore this email.',
-                        from_email=django_settings.DEFAULT_FROM_EMAIL,
+                        template_name='emails/password_reset.html',
+                        context={'reset_link': reset_link},
                         recipient_list=[user.email],
                         fail_silently=False,
                     )
@@ -385,3 +441,140 @@ class PasswordResetConfirmView(APIView):
             return Response({"error": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VerifyEmailView(APIView):
+    """Verify email address using a 6-digit OTP code."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = VerifyEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            user = User.objects.get(email=data['email'])
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No account found with this email address.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if user.is_email_verified:
+            return Response(
+                {'error': 'This email is already verified. You can log in.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Find a valid (unused, not expired) OTP for this user
+        otp = EmailVerification.objects.filter(
+            user=user,
+            otp_code=data['otp_code'],
+            is_used=False,
+            expires_at__gt=timezone.now(),
+        ).order_by('-created_at').first()
+
+        if not otp:
+            return Response(
+                {'error': 'Invalid or expired verification code. Please request a new one.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mark OTP as used and activate user
+        otp.is_used = True
+        otp.save(update_fields=['is_used'])
+
+        user.is_active = True
+        user.is_email_verified = True
+        user.save(update_fields=['is_active', 'is_email_verified'])
+
+        # Return tokens so user is logged in immediately
+        tokens = generate_tokens(user)
+        return Response({
+            'message': 'Email verified successfully!',
+            'user': UserSerializer(user).data,
+            **tokens
+        })
+
+
+class ResendOTPView(APIView):
+    """Resend OTP verification code to the user's email."""
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'  # Reuse the login rate limit (10/min)
+
+    def post(self, request):
+        serializer = ResendOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Don't reveal whether email exists
+            return Response(
+                {'message': 'If an account with that email exists, a new verification code has been sent.'},
+                status=status.HTTP_200_OK
+            )
+
+        if user.is_email_verified:
+            return Response(
+                {'error': 'This email is already verified. You can log in.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check cooldown — prevent resend within 60 seconds
+        recent_otp = EmailVerification.objects.filter(
+            user=user,
+            is_used=False,
+            created_at__gt=timezone.now() - timedelta(seconds=60),
+        ).first()
+
+        if recent_otp:
+            return Response(
+                {'error': 'Please wait before requesting another code.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        try:
+            _create_and_send_otp(user)
+        except Exception as e:
+            print(f"Error sending OTP email: {e}")
+            return Response(
+                {'error': 'Failed to send verification email. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response(
+            {'message': 'A new verification code has been sent to your email.'},
+            status=status.HTTP_200_OK
+        )
+
+class SystemNotificationListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .models import SystemNotification
+        notifications = SystemNotification.objects.filter(
+            user=request.user
+        ).order_by('-created_at')[:50]
+        serializer = SystemNotificationSerializer(notifications, many=True)
+        return Response(serializer.data)
+
+class SystemNotificationMarkReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk=None):
+        from .models import SystemNotification
+        if pk:
+            try:
+                notification = SystemNotification.objects.get(id=pk, user=request.user)
+                notification.is_read = True
+                notification.save(update_fields=['is_read'])
+            except SystemNotification.DoesNotExist:
+                return Response({'error': 'Notification not found'}, status=404)
+        else:
+            # Mark all as read
+            SystemNotification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+            
+        return Response({'success': True})

@@ -1,0 +1,16 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Notice</h2>
+<p>Hello {{ name|default:"Customer" }},</p>
+
+<div style="margin: 25px 0;">
+    <p>{{ message }}</p>
+</div>
+
+<div class="button-wrapper">
+    <a href="{{ frontend_url }}" class="btn">Log In to AquaBill</a>
+</div>
+
+<p>— The AquaBill AI Team</p>
+{% endblock %}

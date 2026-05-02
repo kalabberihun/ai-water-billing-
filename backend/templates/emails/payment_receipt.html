@@ -1,0 +1,21 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Payment Receipt</h2>
+<p>Hello {{ customer_name }},</p>
+<p>We have successfully received your payment. Thank you!</p>
+
+<div class="highlight-box">
+    <p style="margin: 0; color: #6b7280; font-size: 14px; text-transform: uppercase;">Amount Paid</p>
+    <p class="highlight-text" style="letter-spacing: normal; color: #10b981;">${{ amount }}</p>
+</div>
+
+<p><strong>Receipt ID:</strong> {{ receipt_id }}</p>
+<p><strong>Date:</strong> {{ date }}</p>
+
+<div class="button-wrapper">
+    <a href="{{ frontend_url }}/bills" class="btn">View Account</a>
+</div>
+
+<p>— The AquaBill AI Team</p>
+{% endblock %}

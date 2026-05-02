@@ -30,25 +30,39 @@ const NotificationBell = () => {
                 let uCount = 0;
                 let fetchedAlerts = [];
 
+                // Always fetch System Notifications for the user
+                try {
+                    const notifyRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/`, config);
+                    fetchedAlerts = notifyRes.data.filter(n => !n.is_read);
+                } catch (e) {
+                    console.error("Failed to fetch system notifications", e);
+                }
+
                 if (isClerk) {
-                    const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/metering/clerk/pending-readings`, config);
-                    if (res.data && res.data.length > 0) {
-                        fetchedAlerts.push({
-                            id: 'clerk-manual-reviews',
-                            alert_type: 'CLERK_REVIEW',
-                            message: `You have ${res.data.length} meter readings requiring manual review in your queue.`,
-                            created_at: new Date().toISOString()
-                        });
-                    }
-                } else {
-                    // For typical customers - returns 400 if user doesn't have a linked Customer profile
-                    const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/billing/customer-stats`, config);
-                    
-                    if (res.data.balance) {
-                        const balanceVal = parseFloat(res.data.balance.replace(/,/g, ''));
-                        if (balanceVal > 0) uCount += 1;
-                    }
-                    fetchedAlerts = res.data.alerts || [];
+                    try {
+                        const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/metering/clerk/pending-readings`, config);
+                        if (res.data && res.data.length > 0) {
+                            fetchedAlerts.push({
+                                id: 'clerk-manual-reviews',
+                                alert_type: 'CLERK_REVIEW',
+                                message: `You have ${res.data.length} meter readings requiring manual review in your queue.`,
+                                created_at: new Date().toISOString()
+                            });
+                        }
+                    } catch(e) {}
+                } else if (!isClerk && user?.role !== 'ADMIN' && user?.role !== 'TECHNICIAN') {
+                    // For typical customers - check unpaid balance
+                    try {
+                        const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/billing/customer-stats`, config);
+                        
+                        if (res.data.balance) {
+                            const balanceVal = parseFloat(res.data.balance.replace(/,/g, ''));
+                            if (balanceVal > 0) uCount += 1;
+                        }
+                        
+                        // we no longer rely purely on res.data.alerts because system notifications already capture them, 
+                        // but if there are legacy ones we could push them. For now, system notifications are enough.
+                    } catch(e) {}
                 }
                 
                 setAlerts(fetchedAlerts);
@@ -65,12 +79,7 @@ const NotificationBell = () => {
                     setHasUnread(false);
                 }
             } catch (error) {
-                if (error.response?.status !== 401 && error.response?.status !== 403) {
-                    // Ignore 400s if it's admin/staff without a customer profile
-                    if (error.response?.status !== 400) {
-                        console.error("Failed to fetch notifications", error);
-                    }
-                }
+                console.error("Failed to process notifications", error);
             }
         };
 
@@ -101,6 +110,25 @@ const NotificationBell = () => {
         }
     };
 
+    const handleMarkAsRead = async (alertId) => {
+        // If it's a persisted SystemNotification
+        if (alertId && alertId !== 'clerk-manual-reviews') {
+            try {
+                const tokenStr = localStorage.getItem('tokens');
+                const tokenObj = JSON.parse(tokenStr);
+                await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/${alertId}/read/`, {}, {
+                    headers: { Authorization: `Bearer ${tokenObj.access}` }
+                });
+                
+                // Remove locally
+                setAlerts(prev => prev.filter(a => a.id !== alertId));
+                setNotificationCount(prev => prev - 1);
+            } catch (e) {
+                console.error("Failed to mark notification as read", e);
+            }
+        }
+    };
+
     const handleNavigate = (path) => {
         setIsOpen(false);
         navigate(path);
@@ -109,14 +137,17 @@ const NotificationBell = () => {
     const getAlertIcon = (type) => {
         if (type === 'LEAK') return { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', icon: '💧' };
         if (type === 'CLERK_REVIEW') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', icon: '📋' };
+        if (type === 'TASK') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', icon: '🛠️' };
         if (type === 'INFO') return { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', icon: 'ℹ️' };
+        if (type === 'WARNING') return { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', icon: '⚠️' };
         return { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', icon: '📈' };
     };
 
     const getAlertTitle = (type) => {
         if (type === 'LEAK') return 'Possible Leak Detected';
-        if (type === 'CLERK_REVIEW') return 'Action Required';
+        if (type === 'CLERK_REVIEW' || type === 'TASK') return 'Action Required';
         if (type === 'INFO') return 'Information';
+        if (type === 'WARNING') return 'Warning';
         return 'Usage Spike Detected';
     };
 
@@ -243,33 +274,57 @@ const NotificationBell = () => {
                                     return (
                                         <div 
                                             key={alert.id}
-                                            onClick={() => alert.alert_type === 'CLERK_REVIEW' ? handleNavigate('/clerk') : null}
                                             style={{
                                                 padding: '12px 16px',
                                                 borderBottom: '1px solid var(--border-subtle)',
-                                                cursor: alert.alert_type === 'CLERK_REVIEW' ? 'pointer' : 'default',
-                                                transition: 'background 0.2s ease'
+                                                cursor: 'pointer',
+                                                transition: 'background 0.2s ease',
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '12px',
+                                                position: 'relative'
                                             }}
-                                            onMouseEnter={(e) => { if(alert.alert_type === 'CLERK_REVIEW') e.currentTarget.style.background = 'var(--bg-glass-hover)'; }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass-hover)'}
                                             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                            onClick={() => {
+                                                if (alert.alert_type === 'CLERK_REVIEW') {
+                                                    handleNavigate('/clerk');
+                                                } else if (alert.alert_type === 'TASK') {
+                                                    handleNavigate(user?.role === 'TECHNICIAN' ? '/technician' : '/clerk');
+                                                } else if (alert.alert_type === 'INFO' || alert.alert_type === 'WARNING') {
+                                                    handleNavigate('/bills');
+                                                }
+                                                handleMarkAsRead(alert.id);
+                                            }}
                                         >
-                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                                <div style={{
-                                                    width: '32px', height: '32px', borderRadius: '50%',
-                                                    background: design.bg, color: design.color,
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0
-                                                }}>
-                                                    {design.icon}
+                                            <div style={{
+                                                width: '32px', height: '32px', borderRadius: '50%',
+                                                background: design.bg, color: design.color,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0
+                                            }}>
+                                                {design.icon}
+                                            </div>
+                                            <div style={{ flexGrow: 1 }}>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>
+                                                    {getAlertTitle(alert.alert_type)}
                                                 </div>
-                                                <div>
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>
-                                                        {getAlertTitle(alert.alert_type)}
-                                                    </div>
-                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                        {alert.message}
-                                                    </div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                    {alert.message}
                                                 </div>
                                             </div>
+                                            
+                                            {alert.id !== 'clerk-manual-reviews' && (
+                                                <div 
+                                                    style={{ color: 'var(--text-secondary)', fontSize: '1rem', padding: '0 4px' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleMarkAsRead(alert.id);
+                                                    }}
+                                                    title="Mark as read"
+                                                >
+                                                    ✕
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}

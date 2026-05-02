@@ -5,6 +5,7 @@ import LandingPage, { FeaturesPage, HowItWorksPage, WhyUsPage, AboutUsPage } fro
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import MeterReadings from './pages/MeterReadings';
@@ -12,8 +13,11 @@ import Bills from './pages/Bills';
 import AdminDashboard from './pages/AdminDashboard';
 import ClerkDashboard from './pages/ClerkDashboard';
 import TechnicianDashboard from './pages/TechnicianDashboard';
+import AdminLeakageReports from './pages/AdminLeakageReports';
+import ReportLeakage from './pages/ReportLeakage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PrivateRoute from './components/PrivateRoute';
+import SupportWidget from './components/SupportWidget';
 
 // Shows landing page if not logged in, redirects to dashboard if logged in
 const HomeRedirect = () => {
@@ -33,6 +37,7 @@ function App() {
             <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password/:uidb64/:token" element={<ResetPassword />} />
                 <Route path="/" element={<HomeRedirect />} />
@@ -105,7 +110,13 @@ function App() {
                         <TechnicianDashboard />
                     </PrivateRoute>
                 } />
+                <Route path="/report-leakage" element={
+                    <PrivateRoute>
+                        <ReportLeakage />
+                    </PrivateRoute>
+                } />
             </Routes>
+            <SupportWidget />
         </Router>
     );
 }

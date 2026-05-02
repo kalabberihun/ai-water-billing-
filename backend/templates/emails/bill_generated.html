@@ -1,0 +1,21 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Your New Bill is Ready</h2>
+<p>Hello {{ customer_name }},</p>
+<p>A new water bill has been generated for meter <strong>{{ meter_number }}</strong>.</p>
+
+<div class="highlight-box">
+    <p style="margin: 0; color: #6b7280; font-size: 14px; text-transform: uppercase;">Total Due</p>
+    <p class="highlight-text" style="letter-spacing: normal;">${{ amount }}</p>
+</div>
+
+<p><strong>Due Date:</strong> {{ due_date }}</p>
+
+<div class="button-wrapper">
+    <a href="{{ frontend_url }}/bills" class="btn">View & Pay Bill</a>
+</div>
+
+<p>Thank you for your prompt payment.</p>
+<p>— The AquaBill AI Team</p>
+{% endblock %}

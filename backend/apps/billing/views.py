@@ -43,7 +43,32 @@ class PaymentCreateView(APIView):
             # Payment interval limit
             today = timezone.now().date()
             if Payment.objects.filter(bill__customer=request.user.customer, status='COMPLETED', paid_at__year=today.year, paid_at__month=today.month).exists():
-                return Response({'error': "You have already made a payment this month. Additional payments are restricted until next month."}, status=400)
+                message = "You have already made a payment this month. Additional payments are restricted until next month."
+                
+                from apps.accounts.models import SystemNotification
+                from utils.email import send_html_email
+                
+                SystemNotification.objects.create(
+                    user=request.user,
+                    alert_type='WARNING',
+                    message=message
+                )
+                
+                try:
+                    send_html_email(
+                        subject='Monthly Payment Restriction',
+                        template_name='emails/notification.html',
+                        context={
+                            'name': request.user.first_name or 'Customer',
+                            'message': message
+                        },
+                        recipient_list=[request.user.email],
+                        fail_silently=True
+                    )
+                except Exception:
+                    pass
+                    
+                return Response({'error': message}, status=400)
             
             # Payment gateway integration here
             # For demo, mark as completed immediately
@@ -293,7 +318,32 @@ class ChapaInitializeView(APIView):
         # Payment interval limit
         today = timezone.now().date()
         if Payment.objects.filter(bill__customer=bill.customer, status='COMPLETED', paid_at__year=today.year, paid_at__month=today.month).exists():
-            return Response({'error': "You have already made a payment this month. Additional payments are restricted until next month."}, status=status.HTTP_400_BAD_REQUEST)
+            message = "You have already made a payment this month. Additional payments are restricted until next month."
+            
+            from apps.accounts.models import SystemNotification
+            from utils.email import send_html_email
+            
+            SystemNotification.objects.create(
+                user=request.user,
+                alert_type='WARNING',
+                message=message
+            )
+            
+            try:
+                send_html_email(
+                    subject='Monthly Payment Restriction',
+                    template_name='emails/notification.html',
+                    context={
+                        'name': request.user.first_name or 'Customer',
+                        'message': message
+                    },
+                    recipient_list=[request.user.email],
+                    fail_silently=True
+                )
+            except Exception:
+                pass
+
+            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate a unique transaction reference
         tx_ref = f"WATER-{str(bill.id)[:8]}-{uuid_lib.uuid4().hex[:8]}"

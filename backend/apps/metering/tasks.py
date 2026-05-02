@@ -123,7 +123,7 @@ def reassign_expired_reviews():
     from django.utils import timezone
     from apps.metering.models import MeterReading
     from apps.accounts.models import User
-    from django.core.mail import send_mail
+    from utils.email import send_html_email
     
     cutoff = timezone.now() - timedelta(hours=1)
     expired = MeterReading.objects.filter(status='MANUAL_REVIEW', assigned_at__lt=cutoff).exclude(assigned_to__isnull=True)
@@ -148,12 +148,25 @@ def reassign_expired_reviews():
         r.save()
         reassigned += 1
         
+        from apps.accounts.models import SystemNotification
+        
+        SystemNotification.objects.create(
+            user=new_clerk,
+            alert_type='TASK',
+            message='A manual review has been reassigned to you due to expiration. Please check your dashboard.'
+        )
+        
         try:
-            send_mail(
-                'Reassigned Meter Reading Review',
-                f'Hello {new_clerk.first_name},\n\nA manual review has been reassigned to you due to expiration. Please check your dashboard.',
-                'noreply@aiwaterbilling.com',
-                [new_clerk.email],
+            send_html_email(
+                subject='Reassigned Meter Reading Review',
+                template_name='emails/task_assigned.html',
+                context={
+                    'name': new_clerk.first_name or 'Clerk',
+                    'task_type': 'meter reading review',
+                    'meter_number': r.meter.meter_number,
+                    'message': 'A manual review has been reassigned to you due to expiration. Please check your dashboard.'
+                },
+                recipient_list=[new_clerk.email],
                 fail_silently=True,
             )
         except Exception:

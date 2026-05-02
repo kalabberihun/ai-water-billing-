@@ -1,0 +1,19 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>⚠️ Anomaly Alert</h2>
+<p>Hello {{ customer_name }},</p>
+<p>Our AI system has detected unusual water consumption on your meter <strong>{{ meter_number }}</strong>.</p>
+
+<div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <h3 style="color: #b91c1c; margin-top: 0; margin-bottom: 10px;">{{ alert_type }} Detected</h3>
+    <p style="margin: 0; color: #7f1d1d;">{{ message }}</p>
+</div>
+
+<div class="button-wrapper">
+    <a href="{{ frontend_url }}/dashboard" class="btn" style="background-color: #ef4444;">Check Dashboard</a>
+</div>
+
+<p>We recommend inspecting your premises for potential leaks or leaving a note in your dashboard if this usage was expected.</p>
+<p>— The AquaBill AI Team</p>
+{% endblock %}

@@ -4,7 +4,8 @@ from .views import (
     UploadReadingView, VerifyReadingView,
     ReadingStatusView,
     AdminBatchAssignReviewsView, ClerkPendingReadingsView,
-    AdminMaintenanceTaskView, TechnicianMaintenanceTaskView
+    AdminMaintenanceTaskView, TechnicianMaintenanceTaskView,
+    CustomerLeakageReportView, AdminLeakageReportView
 )
 
 urlpatterns = [
@@ -18,4 +19,8 @@ urlpatterns = [
     path('admin/maintenance', AdminMaintenanceTaskView.as_view(), name='admin-maintenance'),
     path('technician/maintenance', TechnicianMaintenanceTaskView.as_view(), name='tech-maintenance-list'),
     path('technician/maintenance/<uuid:pk>', TechnicianMaintenanceTaskView.as_view(), name='tech-maintenance-detail'),
+    # Leakage Reports
+    path('leakage-reports', CustomerLeakageReportView.as_view(), name='customer-leakage-reports'),
+    path('admin/leakage-reports', AdminLeakageReportView.as_view(), name='admin-leakage-reports'),
+    path('admin/leakage-reports/<uuid:report_id>', AdminLeakageReportView.as_view(), name='admin-leakage-report-detail'),
 ]

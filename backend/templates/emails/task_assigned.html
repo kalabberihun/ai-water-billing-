@@ -1,0 +1,25 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>New Task Assigned</h2>
+<p>Hello {{ name }},</p>
+<p>A new {{ task_type }} has been assigned to you.</p>
+
+<div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <p style="margin: 0; color: #1e3a8a;"><strong>Meter:</strong> {{ meter_number }}</p>
+    {% if customer_name %}
+    <p style="margin: 8px 0 0 0; color: #1e3a8a;"><strong>Customer:</strong> {{ customer_name }}</p>
+    {% endif %}
+    {% if address %}
+    <p style="margin: 8px 0 0 0; color: #1e3a8a;"><strong>Address:</strong> {{ address }}</p>
+    {% endif %}
+</div>
+
+<p>{{ message }}</p>
+
+<div class="button-wrapper">
+    <a href="{{ frontend_url }}" class="btn">View Task</a>
+</div>
+
+<p>— AquaBill AI Dispatch</p>
+{% endblock %}

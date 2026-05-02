@@ -29,8 +29,9 @@ const Register = () => {
         setError('');
         setLoading(true);
         try {
-            await axios.post(`${API_URL}/api/auth/register`, formData);
-            navigate('/login');
+            const res = await axios.post(`${API_URL}/api/auth/register`, formData);
+            // Redirect to email verification page
+            navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
         } catch (err) {
             const data = err.response?.data;
             if (data && typeof data === 'object') {
