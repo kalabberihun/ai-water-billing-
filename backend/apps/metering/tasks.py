@@ -173,3 +173,18 @@ def reassign_expired_reviews():
             pass
             
     return f"Reassigned {reassigned} expiring reviews"
+
+@shared_task
+def delete_resolved_leakage_reports():
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.metering.models import LeakageReport
+    
+    cutoff = timezone.now() - timedelta(hours=24)
+    expired = LeakageReport.objects.filter(status='RESOLVED', updated_at__lt=cutoff)
+    
+    count = expired.count()
+    if count > 0:
+        expired.delete()
+        return f"Deleted {count} resolved leakage reports older than 24 hours"
+    return "No resolved leakage reports to delete"

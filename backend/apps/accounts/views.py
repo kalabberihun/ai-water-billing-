@@ -99,7 +99,8 @@ class RegisterView(APIView):
                 national_id=data['national_id'],
                 phone=data.get('phone', ''),
                 address=data.get('address', ''),
-                city=data.get('city', '')
+                city=data.get('city', ''),
+                customer_class=data.get('customer_class', 'RESIDENT')
             )
 
             # Assign meter to customer
@@ -137,16 +138,7 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-        # Block unverified users
-        if not user.is_email_verified:
-            return Response(
-                {
-                    'error': 'Please verify your email address before logging in.',
-                    'email_not_verified': True,
-                    'email': user.email,
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+
         
         # Check password with legacy fallback
         stored_hash = user.password

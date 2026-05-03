@@ -20,11 +20,6 @@ const Login = () => {
             await dispatch(login({ email, password })).unwrap();
             navigate('/');
         } catch (err) {
-            // If email is not verified, redirect to verification page
-            if (err.email_not_verified) {
-                navigate(`/verify-email?email=${encodeURIComponent(err.email || email)}`);
-                return;
-            }
             setError(err.error || 'Invalid email or password. Please try again.');
         }
     };

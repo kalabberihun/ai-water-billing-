@@ -27,6 +27,7 @@ class RegisterSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20, required=False)
     address = serializers.CharField(required=False)
     city = serializers.CharField(max_length=100, required=False)
+    customer_class = serializers.CharField(max_length=20, required=False)
     
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():

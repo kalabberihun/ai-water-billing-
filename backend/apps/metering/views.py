@@ -18,6 +18,7 @@ from .tasks import process_ocr
 
 class MeterListView(generics.ListAPIView):
     serializer_class = MeterSerializer
+    pagination_class = None
     
     def get_queryset(self):
         if hasattr(self.request.user, 'customer'):
@@ -333,6 +334,23 @@ class AdminMaintenanceTaskView(APIView):
             return Response(MaintenanceTaskSerializer(task).data, status=201)
         return Response(serializer.errors, status=400)
 
+    def delete(self, request, pk=None):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role != 'ADMIN':
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        from .models import MaintenanceTask
+        if not pk:
+            return Response({'error': 'Task ID is required'}, status=400)
+            
+        try:
+            task = MaintenanceTask.objects.get(pk=pk)
+            task.delete()
+            return Response({'message': 'Task deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except MaintenanceTask.DoesNotExist:
+            return Response({'error': 'Task not found'}, status=404)
+
+# Force reload comment
 class TechnicianMaintenanceTaskView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -377,6 +395,22 @@ class TechnicianMaintenanceTaskView(APIView):
             
         task.save()
         return Response(MaintenanceTaskSerializer(task).data)
+
+    def delete(self, request, pk=None):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role != 'TECHNICIAN':
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        from .models import MaintenanceTask
+        if not pk:
+            return Response({'error': 'Task ID is required'}, status=400)
+            
+        try:
+            task = MaintenanceTask.objects.get(pk=pk, assigned_to=request.user)
+            task.delete()
+            return Response({'message': 'Task deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except MaintenanceTask.DoesNotExist:
+            return Response({'error': 'Task not found'}, status=404)
 
 
 # ─── Leakage Report Views ──────────────────────────────────────────────────
@@ -430,6 +464,31 @@ class CustomerLeakageReportView(APIView):
             )
         except Exception:
             pass
+            
+        # Notify Admins via email
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            # Fetch users with ADMIN role
+            admins = User.objects.filter(role__iexact='ADMIN', is_active=True)
+            # If no explicit role, fallback to is_staff
+            if not admins.exists():
+                admins = User.objects.filter(is_staff=True, is_active=True)
+                
+            admin_emails = [admin.email for admin in admins if admin.email]
+            if admin_emails:
+                send_html_email(
+                    subject='⚠️ New Leakage Report - Action Required',
+                    template_name='emails/notification.html',
+                    context={
+                        'name': 'Admin Team',
+                        'message': f"A new leakage report has been submitted by {request.user.get_full_name() or request.user.email}.\n\nLocation: {report.location_description}\nUrgency: {report.get_urgency_display()}\n\nPlease review and dispatch a technician via the Admin Dashboard."
+                    },
+                    recipient_list=admin_emails,
+                    fail_silently=True,
+                )
+        except Exception as e:
+            print(f"Failed to send admin email: {e}")
         
         return Response(LeakageReportSerializer(report).data, status=201)
 

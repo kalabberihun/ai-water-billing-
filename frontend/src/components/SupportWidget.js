@@ -21,14 +21,14 @@ const SupportWidget = () => {
         {
             icon: '📧',
             label: 'Email Support',
-            desc: 'support@aquabillai.com',
-            action: () => window.location.href = 'mailto:support@aquabillai.com'
+            desc: 'Support.aquabillai@gmail.com',
+            action: () => window.location.href = 'mailto:Support.aquabillai@gmail.com'
         },
         {
             icon: '📞',
             label: 'Call Us',
-            desc: '+251 912 345 678',
-            action: () => window.location.href = 'tel:+251912345678'
+            desc: '+251 993 140 988',
+            action: () => window.location.href = 'tel:+251993140988'
         },
         {
             icon: '✈️',

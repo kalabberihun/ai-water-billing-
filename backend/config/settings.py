@@ -157,6 +157,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.billing.tasks.delete_expired_bills',
         'schedule': crontab(minute=0, hour='*'),  # Run at the start of every hour
     },
+    'delete-resolved-leakage-reports-every-hour': {
+        'task': 'apps.metering.tasks.delete_resolved_leakage_reports',
+        'schedule': crontab(minute=0, hour='*'),  # Run at the start of every hour
+    },
 }
 
 # Encryption

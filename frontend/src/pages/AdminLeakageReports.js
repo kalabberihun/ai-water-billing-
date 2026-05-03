@@ -18,15 +18,20 @@ const AdminLeakageReports = () => {
 
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                const config = getConfig();
-                const [reportsRes, usersRes] = await Promise.all([
-                    axios.get(`${API_URL}/api/metering/admin/leakage-reports`, config),
-                    axios.get(`${API_URL}/api/accounts/admin/users`, config)
-                ]);
+            const config = getConfig();
 
-                setReports(reportsRes.data);
-                // Filter users to only those with Technician role
+            // Fetch reports — this is the primary data
+            try {
+                const reportsRes = await axios.get(`${API_URL}/api/metering/admin/leakage-reports`, config);
+                setReports(reportsRes.data || []);
+            } catch (err) {
+                console.error('Failed to fetch leakage reports:', err);
+                setError('Failed to fetch leakage reports.');
+            }
+
+            // Fetch technicians — secondary, don't let it break the page
+            try {
+                const usersRes = await axios.get(`${API_URL}/api/auth/admin/users`, config);
                 if (usersRes.data && usersRes.data.users) {
                     const techs = usersRes.data.users.filter(u => 
                         u.role === 'Technician' || u.role === 'TECHNICIAN'
@@ -34,11 +39,10 @@ const AdminLeakageReports = () => {
                     setTechnicians(techs);
                 }
             } catch (err) {
-                console.error(err);
-                setError('Failed to fetch leakage reports or users.');
-            } finally {
-                setLoading(false);
+                console.error('Failed to fetch technicians:', err);
             }
+
+            setLoading(false);
         };
         fetchData();
     }, []);

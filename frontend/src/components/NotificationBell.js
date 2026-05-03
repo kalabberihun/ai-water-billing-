@@ -11,10 +11,20 @@ const NotificationBell = () => {
     const [unpaidCount, setUnpaidCount] = useState(0);
     const [alerts, setAlerts] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
-    const [hasUnread, setHasUnread] = useState(false);
     
     const bellRef = useRef(null);
     const navigate = useNavigate();
+
+    const getClickedAlerts = () => {
+        try { return JSON.parse(sessionStorage.getItem('clickedAlerts') || '[]'); } catch { return []; }
+    };
+
+    const addClickedAlert = (id) => {
+        const current = getClickedAlerts();
+        if (!current.includes(id)) {
+            sessionStorage.setItem('clickedAlerts', JSON.stringify([...current, id]));
+        }
+    };
 
     useEffect(() => {
         const checkNotifications = async () => {
@@ -26,14 +36,14 @@ const NotificationBell = () => {
                 if (!tokenObj?.access) return;
 
                 const config = { headers: { Authorization: `Bearer ${tokenObj.access}` } };
-                
                 let uCount = 0;
                 let fetchedAlerts = [];
+                const clickedAlerts = getClickedAlerts();
 
                 // Always fetch System Notifications for the user
                 try {
                     const notifyRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/`, config);
-                    fetchedAlerts = notifyRes.data.filter(n => !n.is_read);
+                    fetchedAlerts = notifyRes.data.filter(n => !n.is_read && !clickedAlerts.includes(n.id));
                 } catch (e) {
                     console.error("Failed to fetch system notifications", e);
                 }
@@ -41,7 +51,7 @@ const NotificationBell = () => {
                 if (isClerk) {
                     try {
                         const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/metering/clerk/pending-readings`, config);
-                        if (res.data && res.data.length > 0) {
+                        if (res.data && res.data.length > 0 && !clickedAlerts.includes('clerk-manual-reviews')) {
                             fetchedAlerts.push({
                                 id: 'clerk-manual-reviews',
                                 alert_type: 'CLERK_REVIEW',
@@ -50,18 +60,44 @@ const NotificationBell = () => {
                             });
                         }
                     } catch(e) {}
-                } else if (!isClerk && user?.role !== 'ADMIN' && user?.role !== 'TECHNICIAN') {
+                } else if (user?.role === 'ADMIN' || user?.role === 'Admin' || user?.is_staff) {
+                    try {
+                        const [disputesRes, leakageRes] = await Promise.all([
+                            axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/admin/disputes`, config),
+                            axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/metering/admin/leakage-reports`, config)
+                        ]);
+                        
+                        const pendingDisputes = disputesRes.data?.filter(d => d.status !== 'RESOLVED' && d.status !== 'REJECTED') || [];
+                        if (pendingDisputes.length > 0 && !clickedAlerts.includes('admin-disputes')) {
+                            fetchedAlerts.push({
+                                id: 'admin-disputes',
+                                alert_type: 'ADMIN_DISPUTES',
+                                message: `You have ${pendingDisputes.length} pending billing disputes requiring review.`,
+                                created_at: new Date().toISOString()
+                            });
+                        }
+
+                        const pendingLeakage = leakageRes.data?.filter(l => l.status !== 'RESOLVED' && l.status !== 'FALSE_ALARM') || [];
+                        if (pendingLeakage.length > 0 && !clickedAlerts.includes('admin-leakage')) {
+                            fetchedAlerts.push({
+                                id: 'admin-leakage',
+                                alert_type: 'ADMIN_LEAKAGE',
+                                message: `You have ${pendingLeakage.length} active leakage reports requiring attention.`,
+                                created_at: new Date().toISOString()
+                            });
+                        }
+                    } catch(e) {}
+                } else if (!isClerk && user?.role !== 'TECHNICIAN') {
                     // For typical customers - check unpaid balance
                     try {
                         const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/billing/customer-stats`, config);
                         
                         if (res.data.balance) {
                             const balanceVal = parseFloat(res.data.balance.replace(/,/g, ''));
-                            if (balanceVal > 0) uCount += 1;
+                            if (balanceVal > 0 && !clickedAlerts.includes('unpaid-bill')) {
+                                uCount += 1;
+                            }
                         }
-                        
-                        // we no longer rely purely on res.data.alerts because system notifications already capture them, 
-                        // but if there are legacy ones we could push them. For now, system notifications are enough.
                     } catch(e) {}
                 }
                 
@@ -70,14 +106,6 @@ const NotificationBell = () => {
                 
                 const currentTotal = uCount + fetchedAlerts.length;
                 setNotificationCount(currentTotal);
-                
-                const currentSnapshot = JSON.stringify({ unpaid: uCount, alerts: fetchedAlerts.map(a => a.id) });
-                const lastSeenSnapshot = localStorage.getItem('lastSeenNotifications');
-                if (currentTotal > 0 && currentSnapshot !== lastSeenSnapshot) {
-                    setHasUnread(true);
-                } else {
-                    setHasUnread(false);
-                }
             } catch (error) {
                 console.error("Failed to process notifications", error);
             }
@@ -100,32 +128,33 @@ const NotificationBell = () => {
     }, [isClerk]);
 
     const toggleDropdown = () => {
-        const newIsOpen = !isOpen;
-        setIsOpen(newIsOpen);
-        
-        if (newIsOpen && notificationCount > 0) {
-            const currentSnapshot = JSON.stringify({ unpaid: unpaidCount, alerts: alerts.map(a => a.id) });
-            localStorage.setItem('lastSeenNotifications', currentSnapshot);
-            setHasUnread(false);
-        }
+        setIsOpen(!isOpen);
     };
 
     const handleMarkAsRead = async (alertId) => {
+        if (!alertId) return;
+
+        addClickedAlert(alertId);
+
+        if (alertId === 'clerk-manual-reviews' || alertId === 'admin-disputes' || alertId === 'admin-leakage') {
+            setAlerts(prev => prev.filter(a => a.id !== alertId));
+            setNotificationCount(prev => Math.max(0, prev - 1));
+            return;
+        }
+
         // If it's a persisted SystemNotification
-        if (alertId && alertId !== 'clerk-manual-reviews') {
-            try {
-                const tokenStr = localStorage.getItem('tokens');
-                const tokenObj = JSON.parse(tokenStr);
-                await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/${alertId}/read/`, {}, {
-                    headers: { Authorization: `Bearer ${tokenObj.access}` }
-                });
-                
-                // Remove locally
-                setAlerts(prev => prev.filter(a => a.id !== alertId));
-                setNotificationCount(prev => prev - 1);
-            } catch (e) {
-                console.error("Failed to mark notification as read", e);
-            }
+        try {
+            const tokenStr = localStorage.getItem('tokens');
+            const tokenObj = JSON.parse(tokenStr);
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/${alertId}/read/`, {}, {
+                headers: { Authorization: `Bearer ${tokenObj.access}` }
+            });
+            
+            // Remove locally
+            setAlerts(prev => prev.filter(a => a.id !== alertId));
+            setNotificationCount(prev => Math.max(0, prev - 1));
+        } catch (e) {
+            console.error("Failed to mark notification as read", e);
         }
     };
 
@@ -136,6 +165,8 @@ const NotificationBell = () => {
 
     const getAlertIcon = (type) => {
         if (type === 'LEAK') return { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', icon: '💧' };
+        if (type === 'ADMIN_LEAKAGE') return { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', icon: '🚰' };
+        if (type === 'ADMIN_DISPUTES') return { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', icon: '⚖️' };
         if (type === 'CLERK_REVIEW') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', icon: '📋' };
         if (type === 'TASK') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', icon: '🛠️' };
         if (type === 'INFO') return { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', icon: 'ℹ️' };
@@ -145,6 +176,8 @@ const NotificationBell = () => {
 
     const getAlertTitle = (type) => {
         if (type === 'LEAK') return 'Possible Leak Detected';
+        if (type === 'ADMIN_LEAKAGE') return 'New Leakage Report';
+        if (type === 'ADMIN_DISPUTES') return 'New Billing Dispute';
         if (type === 'CLERK_REVIEW' || type === 'TASK') return 'Action Required';
         if (type === 'INFO') return 'Information';
         if (type === 'WARNING') return 'Warning';
@@ -159,12 +192,12 @@ const NotificationBell = () => {
             >
                 <span 
                     style={{ fontSize: '1.5rem', opacity: notificationCount === 0 ? 0.6 : 1 }} 
-                    title={hasUnread ? `${notificationCount} new notifications` : `Notifications`}
+                    title={notificationCount > 0 ? `${notificationCount} new notifications` : `Notifications`}
                 >
                     🔔
                 </span>
                 
-                {hasUnread && notificationCount > 0 && (
+                {notificationCount > 0 && (
                     <span style={{
                         position: 'absolute',
                         top: '-5px',
@@ -238,7 +271,12 @@ const NotificationBell = () => {
                             <>
                                 {unpaidCount > 0 && (
                                     <div 
-                                        onClick={() => handleNavigate('/bills')}
+                                        onClick={() => {
+                                            addClickedAlert('unpaid-bill');
+                                            setUnpaidCount(0);
+                                            setNotificationCount(prev => Math.max(0, prev - 1));
+                                            handleNavigate('/bills');
+                                        }}
                                         style={{
                                             padding: '12px 16px',
                                             borderBottom: '1px solid var(--border-subtle)',
@@ -289,6 +327,10 @@ const NotificationBell = () => {
                                             onClick={() => {
                                                 if (alert.alert_type === 'CLERK_REVIEW') {
                                                     handleNavigate('/clerk');
+                                                } else if (alert.alert_type === 'ADMIN_DISPUTES') {
+                                                    handleNavigate('/admin/disputes');
+                                                } else if (alert.alert_type === 'ADMIN_LEAKAGE') {
+                                                    handleNavigate('/admin/leakage-reports');
                                                 } else if (alert.alert_type === 'TASK') {
                                                     handleNavigate(user?.role === 'TECHNICIAN' ? '/technician' : '/clerk');
                                                 } else if (alert.alert_type === 'INFO' || alert.alert_type === 'WARNING') {

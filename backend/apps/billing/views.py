@@ -181,22 +181,55 @@ class ConsumptionPredictionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        if not hasattr(request.user, 'customer'):
-            return Response({'error': 'Prediction only available for customers'}, status=400)
+        customer_id = request.query_params.get('customer_id')
+        
+        # If admin/staff is requesting for a specific customer
+        if customer_id and (request.user.is_staff or (request.user.role and request.user.role.name.upper() in ['ADMIN', 'CLERK'])):
+            from apps.accounts.models import Customer
+            try:
+                customer = Customer.objects.get(id=customer_id)
+            except Customer.DoesNotExist:
+                return Response({'error': 'Customer not found'}, status=404)
+        else:
+            # Normal customer flow
+            if not hasattr(request.user, 'customer'):
+                return Response({'error': 'Prediction only available for customers'}, status=400)
+            customer = request.user.customer
             
-        prediction_data = predict_next_consumption(request.user.customer)
+        prediction_data = predict_next_consumption(customer)
         
         if not prediction_data:
             return Response({
                 'message': 'Insufficient data for prediction. Please wait until you have at least 2 bills.'
             }, status=200)
             
-        # Estimate cost based on predicted units
-        # Simple estimation using average price per unit (can be made more precise with tiers)
+        # Estimate cost based on predicted units using actual tiered logic
+        from decimal import Decimal
         from .models import TariffTier
-        avg_price = TariffTier.objects.all().aggregate(avg=Avg('price_per_unit'))['avg'] or 50
-        estimated_cost = float(prediction_data['predicted_consumption']) * float(avg_price)
         
+        predicted_consumption = Decimal(str(prediction_data['predicted_consumption']))
+        customer_class = customer.customer_class or 'RESIDENT'
+        tiers = TariffTier.objects.filter(customer_class=customer_class)
+        if not tiers.exists():
+            tiers = TariffTier.objects.filter(customer_class='RESIDENT')
+            
+        subtotal = Decimal('0')
+        remaining = predicted_consumption
+        
+        for tier in tiers:
+            if remaining <= 0:
+                break
+            tier_usage = min(remaining, tier.max_usage - tier.min_usage)
+            subtotal += tier_usage * tier.price_per_unit
+            remaining -= tier_usage
+            
+        # Add fixed base fee (e.g. meter maintenance fee)
+        base_fee = Decimal('5.00')
+        subtotal += base_fee
+        
+        # Add 5% tax
+        tax_amount = subtotal * Decimal('0.05')
+        estimated_cost = float(subtotal + tax_amount)
         prediction_data['estimated_cost'] = round(estimated_cost, 2)
         prediction_data['next_month'] = (date.today() + relativedelta(months=1)).strftime('%B %Y')
         

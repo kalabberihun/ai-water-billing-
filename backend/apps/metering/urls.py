@@ -17,6 +17,7 @@ urlpatterns = [
     path('admin/batch-assign', AdminBatchAssignReviewsView.as_view(), name='batch-assign-reviews'),
     path('clerk/pending-readings', ClerkPendingReadingsView.as_view(), name='clerk-pending-readings'),
     path('admin/maintenance', AdminMaintenanceTaskView.as_view(), name='admin-maintenance'),
+    path('admin/maintenance/<uuid:pk>', AdminMaintenanceTaskView.as_view(), name='admin-maintenance-detail'),
     path('technician/maintenance', TechnicianMaintenanceTaskView.as_view(), name='tech-maintenance-list'),
     path('technician/maintenance/<uuid:pk>', TechnicianMaintenanceTaskView.as_view(), name='tech-maintenance-detail'),
     # Leakage Reports

@@ -69,6 +69,16 @@ const TechnicianDashboard = () => {
         }
     };
 
+    const handleDeleteTask = async (taskId) => {
+        if (!window.confirm('Are you sure you want to delete this maintenance task?')) return;
+        try {
+            await axios.delete(`${API}/api/metering/technician/maintenance/${taskId}`, getConfig());
+            fetchData();
+        } catch (error) {
+            alert('Failed to delete task: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
     // Calculate metrics
     const pendingTasks = tasks.filter(t => t.status === 'PENDING');
     const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS');
@@ -252,6 +262,13 @@ const TechnicianDashboard = () => {
                                                         onClick={() => openResolve(task)}
                                                     >
                                                         {task.status === 'RESOLVED' ? 'View/Edit' : 'Update'}
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-sm" 
+                                                        onClick={() => handleDeleteTask(task.id)}
+                                                        style={{ marginLeft: '0.5rem', padding: '4px 8px', fontSize: '0.8rem', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', cursor: 'pointer', borderRadius: '4px' }}
+                                                    >
+                                                        Delete
                                                     </button>
                                                 </td>
                                             </tr>

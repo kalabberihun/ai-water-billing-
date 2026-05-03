@@ -3,16 +3,25 @@ from decimal import Decimal
 from django.db import models
 
 class TariffTier(models.Model):
-    """Tiered pricing structure"""
+    """Tiered pricing structure per customer class"""
+    CUSTOMER_CLASS_CHOICES = [
+        ('RESIDENT', 'Resident'),
+        ('ORGANIZATION', 'Organization'),
+        ('FACTORY', 'Factory'),
+        ('GOVERNMENT', 'Government Organization'),
+        ('PUBLIC_SERVICE', 'Public Service'),
+    ]
+
+    customer_class = models.CharField(max_length=20, choices=CUSTOMER_CLASS_CHOICES, default='RESIDENT')
     min_usage = models.DecimalField(max_digits=12, decimal_places=2)
     max_usage = models.DecimalField(max_digits=12, decimal_places=2)
     price_per_unit = models.DecimalField(max_digits=12, decimal_places=4)
     
     class Meta:
-        ordering = ['min_usage']
+        ordering = ['customer_class', 'min_usage']
     
     def __str__(self):
-        return f"{self.min_usage}-{self.max_usage} units @ {self.price_per_unit}"
+        return f"[{self.get_customer_class_display()}] {self.min_usage}-{self.max_usage} m3 @ {self.price_per_unit} ETB"
 
 class Bill(models.Model):
     STATUS_CHOICES = [

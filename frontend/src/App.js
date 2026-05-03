@@ -110,6 +110,11 @@ function App() {
                         <TechnicianDashboard />
                     </PrivateRoute>
                 } />
+                <Route path="/admin/leakage-reports" element={
+                    <PrivateRoute>
+                        <AdminLeakageReports />
+                    </PrivateRoute>
+                } />
                 <Route path="/report-leakage" element={
                     <PrivateRoute>
                         <ReportLeakage />

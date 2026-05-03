@@ -81,7 +81,7 @@ const LandingLayout = ({ children }) => {
                         <div className="landing-footer-col">
                             <h4>Company</h4>
                             <Link to="/about">About Us</Link>
-                            <a href="mailto:support@aquabillai.com">Contact</a>
+                            <a href="mailto:Support.aquabillai@gmail.com">Contact</a>
                         </div>
                         <div className="landing-footer-col">
                             <h4>Account</h4>
@@ -107,7 +107,7 @@ const LandingPage = () => {
         <LandingLayout>
             <section className="landing-hero">
                 <div className="landing-hero-content">
-                    <div className="landing-hero-badge">🚀 AI-Powered Water Management</div>
+                    <div className="landing-hero-badge"> AI-Powered Water Management</div>
                     <h1 className="landing-hero-title">
                         Smart Water Billing,{' '}
                         <span className="landing-gradient-text">Powered by AI</span>
@@ -166,7 +166,7 @@ const LandingPage = () => {
                     {[
                         { icon: '✨', title: 'Features', desc: 'AI meter reading, automated billing, real-time analytics, and more.', path: '/features' },
                         { icon: '⚙️', title: 'How It Works', desc: 'From meter photo to generated bill in under a minute.', path: '/how-it-works' },
-                        { icon: '🏆', title: 'Why Us', desc: '10,000+ customers, 99.5% accuracy, 24/7 uptime.', path: '/why-us' },
+                        { icon: '🏆', title: 'Why Us', desc: '10,000+ customers, 80% accuracy, 24/7 uptime.', path: '/why-us' },
                     ].map((card, i) => (
                         <Link key={i} to={card.path} className="landing-step" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
                             <div className="landing-step-icon">{card.icon}</div>
@@ -201,7 +201,7 @@ const FeaturesPage = () => {
                     {[
                         {
                             icon: '📸', title: 'AI Meter Reading',
-                            desc: 'Upload a photo of any water meter — our AI extracts the reading in seconds with 99%+ accuracy. No manual entry needed.',
+                            desc: 'Upload a photo of any water meter — our AI extracts the reading in seconds with 80% accuracy. No manual entry needed.',
                             color: '#3478ff'
                         },
                         {
@@ -364,7 +364,7 @@ const WhyUsPage = () => {
                 <div className="landing-stats-grid">
                     {[
                         { value: 10000, suffix: '+', label: 'Customers Served', icon: '👥' },
-                        { value: 99, suffix: '.5%', label: 'AI Accuracy Rate', icon: '🎯' },
+                        { value: 80, suffix: '%', label: 'AI Accuracy Rate', icon: '🎯' },
                         { value: 50, suffix: '%', label: 'Faster Billing', icon: '⚡' },
                         { value: 24, suffix: '/7', label: 'System Uptime', icon: '🛡️' },
                     ].map((stat, i) => (
@@ -387,7 +387,7 @@ const WhyUsPage = () => {
                 <div className="landing-features-grid">
                     {[
                         { icon: '🚀', title: 'Lightning Fast', desc: 'Process thousands of meter readings in minutes, not days. Our AI works 24/7 so your team can focus on what matters.', color: '#3478ff' },
-                        { icon: '🎯', title: 'Incredibly Accurate', desc: '99.5% accuracy rate on meter reading extraction. Low-confidence reads are automatically flagged for human review.', color: '#14b8a6' },
+                        { icon: '🎯', title: 'High Accuracy', desc: '80% accuracy rate on meter reading extraction. Low-confidence reads are automatically flagged for human review.', color: '#14b8a6' },
                         { icon: '💡', title: 'Easy to Use', desc: 'Intuitive interface designed for every role. No training needed — your team can start using it on day one.', color: '#f59e0b' },
                         { icon: '🔒', title: 'Secure & Reliable', desc: 'JWT authentication, encrypted data, role-based access control, and 24/7 uptime monitoring.', color: '#8b5cf6' },
                         { icon: '📈', title: 'Leak Detection', desc: 'AI analyzes consumption patterns and alerts customers and admins about potential leaks before they become costly.', color: '#ef4444' },
@@ -455,9 +455,9 @@ const AboutUsPage = () => {
                 </div>
                 <div className="landing-features-grid" style={{ marginBottom: '4rem' }}>
                     {[
-                        { icon: '👨‍💻', name: 'Kalab Berihun', role: 'Lead Developer & Founder', desc: 'Full-stack engineer with 8+ years in utility management systems and AI integration.', color: '#3478ff' },
+                        { icon: '👨‍💻', name: 'Kalab Berihun', role: 'Lead Developer & Founder', desc: 'Full-stack engineer with 1+ years in utility management systems and AI integration.', color: '#3478ff' },
                         { icon: '👩‍🔬', name: 'Betelhem Tadegegn', role: 'AI/ML Engineer', desc: 'Specialized in computer vision and OCR systems for real-world applications.', color: '#8b5cf6' },
-                        { icon: '👨‍🔧', name: 'Mihretab Sleshi', role: 'Field Operations Lead', desc: 'Former utility technician bringing 12 years of hands-on industry experience.', color: '#10b981' },
+                        { icon: '👨‍💼', name: 'Mihretab Sleshi', role: 'Backend Engineer', desc: 'Expert in scalable API design, database optimization, and cloud infrastructure.', color: '#10b981' },
                         { icon: '👨‍💼', name: 'Mesay Tsegaye', role: 'Backend Engineer', desc: 'Expert in scalable API design, database optimization, and cloud infrastructure.', color: '#f59e0b' },
                         { icon: '👩‍💼', name: 'Mekdes Addis', role: 'UI/UX Designer', desc: 'Passionate about creating intuitive, accessible interfaces that delight users.', color: '#ec4899' },
                     ].map((member, i) => (
@@ -480,8 +480,8 @@ const AboutUsPage = () => {
                 </div>
                 <div className="landing-stats-grid">
                     {[
-                        { icon: '📧', label: 'Email', value: 'support@aquabillai.com', href: 'mailto:support@aquabillai.com' },
-                        { icon: '📞', label: 'Phone', value: '+251 912 345 678', href: 'tel:+251912345678' },
+                        { icon: '📧', label: 'Email', value: 'Support.aquabillai@gmail.com', href: 'mailto:Support.aquabillai@gmail.com' },
+                        { icon: '📞', label: 'Phone', value: '+251 993 140 988', href: 'tel:+251993140988' },
                         { icon: '𝕏', label: 'X (Twitter)', value: '@AquaBillAI', href: 'https://x.com/AquaBillAI' },
                         { icon: '✈️', label: 'Telegram', value: '@AquaBillAI_Bot', href: 'https://t.me/AquaBillAI_Bot' },
                     ].map((contact, i) => (

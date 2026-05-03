@@ -52,12 +52,21 @@ class User(AbstractBaseUser, PermissionsMixin):
         indexes = [models.Index(fields=['role'])]
 
 class Customer(models.Model):
+    CUSTOMER_CLASS_CHOICES = [
+        ('RESIDENT', 'Resident'),
+        ('ORGANIZATION', 'Organization'),
+        ('FACTORY', 'Factory'),
+        ('GOVERNMENT', 'Government Organization'),
+        ('PUBLIC_SERVICE', 'Public Service'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer')
     national_id = EncryptedCharField(max_length=50, unique=True)
     phone = EncryptedCharField(max_length=20, null=True, blank=True)
     address = EncryptedTextField(null=True, blank=True)
     city = models.CharField(max_length=100, blank=True)
+    customer_class = models.CharField(max_length=20, choices=CUSTOMER_CLASS_CHOICES, default='RESIDENT')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)

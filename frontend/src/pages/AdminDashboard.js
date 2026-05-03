@@ -8,6 +8,61 @@ import {
 import Sidebar from '../components/Sidebar';
 import SecureImage from '../components/SecureImage';
 
+const SearchableSelect = ({ options, value, onChange, placeholder }) => {
+    const [search, setSearch] = useState('');
+    const [open, setOpen] = useState(false);
+    
+    const selectedOption = options.find(o => o.value === value);
+    const displayValue = selectedOption ? selectedOption.label : search;
+
+    const filtered = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+        <div style={{ position: 'relative', width: '100%', marginBottom: '1rem' }}>
+            <input 
+                type="text" 
+                placeholder={placeholder}
+                value={open ? search : displayValue}
+                onChange={e => { setSearch(e.target.value); setOpen(true); if(!e.target.value) onChange(''); }}
+                onFocus={() => { setOpen(true); setSearch(''); }}
+                onBlur={() => setTimeout(() => setOpen(false), 200)}
+                style={{ 
+                    width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', 
+                    border: '1px solid var(--border-default)', background: 'var(--bg-body)', 
+                    color: 'var(--text-primary)', fontSize: '0.95rem' 
+                }}
+            />
+            {open && (
+                <div style={{ 
+                    position: 'absolute', top: '100%', left: 0, right: 0, 
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border-default)', 
+                    borderRadius: '8px', marginTop: '4px', maxHeight: '200px', overflowY: 'auto', 
+                    zIndex: 1000, boxShadow: 'var(--shadow-lg)' 
+                }}>
+                    {filtered.length === 0 ? (
+                        <div style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>No matches</div>
+                    ) : filtered.map(opt => (
+                        <div 
+                            key={opt.value} 
+                            onClick={() => { onChange(opt.value); setOpen(false); setSearch(''); }}
+                            style={{ 
+                                padding: '0.75rem 1rem', cursor: 'pointer', 
+                                background: value === opt.value ? 'rgba(52,120,255,0.2)' : 'transparent', 
+                                color: 'var(--text-primary)', fontSize: '0.95rem',
+                                borderBottom: '1px solid var(--border-subtle)'
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                            onMouseLeave={e => e.target.style.background = value === opt.value ? 'rgba(52,120,255,0.2)' : 'transparent'}
+                        >
+                            {opt.label}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'];
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -51,6 +106,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     const [maintForm, setMaintForm] = useState({ meter_id: '', assigned_to: '', issue_description: '' });
     const [maintSubmitting, setMaintSubmitting] = useState(false);
     const [maintError, setMaintError] = useState('');
+
+
 
     const getConfig = () => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
@@ -202,6 +259,16 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         }
     };
 
+    const handleMaintDelete = async (taskId) => {
+        if (!window.confirm('Are you sure you want to delete this maintenance task?')) return;
+        try {
+            await axios.delete(`${API}/api/metering/admin/maintenance/${taskId}`, getConfig());
+            fetchData();
+        } catch (error) {
+            alert('Failed to delete task: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
     const getStatusBadge = (status) => {
         const map = {
             'PENDING': 'badge-warning',
@@ -220,6 +287,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         readings: { title: 'Meter Reading Review', subtitle: 'Review, verify, and assign meter readings' },
         maintenance: { title: 'Field Maintenance', subtitle: 'Dispatch and track technician field tasks' },
         roles: { title: 'Role Management', subtitle: 'Assign and manage user roles across the system' },
+
         system: { title: 'System Management', subtitle: 'Direct access to Django admin resources' },
     };
 
@@ -240,6 +308,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                 return renderMaintenance();
             case 'roles':
                 return renderRoles();
+
             case 'system':
                 return renderSystem();
             default:
@@ -283,7 +352,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
             </div>
 
             {/* Quick overview mini-charts */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', marginTop: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '2rem', marginTop: '2rem' }}>
                 <div className="panel">
                     <div className="panel-header">
                         <h2 className="panel-title">Revenue Trend</h2>
@@ -603,6 +672,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 <th>Tech Assigned</th>
                                 <th>Issue</th>
                                 <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -616,6 +686,15 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                         <span className={`badge ${task.status === 'RESOLVED' ? 'badge-info' : task.status === 'IN_PROGRESS' ? 'badge-primary' : 'badge-warning'}`}>
                                             {task.status === 'IN_PROGRESS' ? '🔧 In Progress' : task.status === 'RESOLVED' ? '✅ Resolved' : '⏳ Pending'}
                                         </span>
+                                    </td>
+                                    <td>
+                                        <button 
+                                            className="btn btn-danger btn-sm" 
+                                            onClick={() => handleMaintDelete(task.id)}
+                                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444' }}
+                                        >
+                                            Delete
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -693,16 +772,16 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         </div>
     );
 
+
     // ═══════════════════════════════════════════════════════════════════════════
-    // SECTION: System
-    // ═══════════════════════════════════════════════════════════════════════════
+
     const renderSystem = () => (
         <div className="panel" style={{ marginBottom: '2rem' }}>
             <div className="panel-header">
                 <h2 className="panel-title">System Management</h2>
             </div>
             <div className="panel-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
                     {/* Accounts */}
                     <div style={{ background: 'var(--bg-body)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '1.25rem' }}>
                         <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
@@ -787,7 +866,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     <div style={{
                         background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
                         width: '100%', maxWidth: '480px', boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-default)'
+                        border: '1px solid var(--border-default)',
+                        maxHeight: '90vh', overflowY: 'auto'
                     }}>
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Review Reading</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
@@ -855,7 +935,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     <div style={{
                         background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
                         width: '100%', maxWidth: '520px', boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-default)'
+                        border: '1px solid var(--border-default)',
+                        maxHeight: '90vh', overflowY: 'auto'
                     }}>
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Review Dispute</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
@@ -943,41 +1024,30 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     <div style={{
                         background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
                         width: '100%', maxWidth: '520px', boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-default)'
+                        border: '1px solid var(--border-default)',
+                        maxHeight: '90vh', overflowY: 'auto'
                     }}>
                         <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Dispatch Technician</h2>
 
                         <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Select Meter</label>
-                        <select
+                        <SearchableSelect
+                            placeholder="-- Type or Select Active Meter --"
                             value={maintForm.meter_id}
-                            onChange={e => { setMaintForm({ ...maintForm, meter_id: e.target.value }); setMaintError(''); }}
-                            style={{
-                                width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
-                                border: '1px solid var(--border-default)', background: 'var(--bg-body)',
-                                color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '1rem'
-                            }}
-                        >
-                            <option value="">-- Select Active Meter --</option>
-                            {(Array.isArray(allMeters) ? allMeters : []).filter(m => m.status?.toUpperCase() === 'ACTIVE').map(meter => (
-                                <option key={meter.id} value={meter.id}>{meter.meter_number}</option>
-                            ))}
-                        </select>
+                            onChange={val => { setMaintForm({ ...maintForm, meter_id: val }); setMaintError(''); }}
+                            options={(Array.isArray(allMeters) ? allMeters : [])
+                                .filter(m => m.status?.toUpperCase() === 'ACTIVE')
+                                .map(m => ({ value: m.id, label: m.meter_number }))}
+                        />
 
                         <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Assign Technician</label>
-                        <select
+                        <SearchableSelect
+                            placeholder="-- Type or Select Technician --"
                             value={maintForm.assigned_to}
-                            onChange={e => { setMaintForm({ ...maintForm, assigned_to: e.target.value }); setMaintError(''); }}
-                            style={{
-                                width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
-                                border: '1px solid var(--border-default)', background: 'var(--bg-body)',
-                                color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '1rem'
-                            }}
-                        >
-                            <option value="">-- Select Technician --</option>
-                            {allUsers.filter(u => u.role?.toUpperCase() === 'TECHNICIAN').map(tech => (
-                                <option key={tech.id} value={tech.id}>{tech.full_name} ({tech.email})</option>
-                            ))}
-                        </select>
+                            onChange={val => { setMaintForm({ ...maintForm, assigned_to: val }); setMaintError(''); }}
+                            options={allUsers
+                                .filter(u => u.role?.toUpperCase() === 'TECHNICIAN')
+                                .map(t => ({ value: t.id, label: `${t.full_name} (${t.email})` }))}
+                        />
 
                         <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Issue Description</label>
                         <textarea

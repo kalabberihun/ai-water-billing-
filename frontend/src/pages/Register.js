@@ -14,7 +14,8 @@ const Register = () => {
         meter_number: '',
         phone: '',
         address: '',
-        city: ''
+        city: '',
+        customer_class: 'RESIDENT'
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -148,16 +149,34 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Meter Number</label>
-                            <input
-                                type="text"
-                                required
-                                className="form-input"
-                                placeholder="MTR-XXXX"
-                                value={formData.meter_number}
-                                onChange={handleChange('meter_number')}
-                            />
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="form-label">Meter Number</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="form-input"
+                                    placeholder="MTR-XXXX"
+                                    value={formData.meter_number}
+                                    onChange={handleChange('meter_number')}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Customer Type</label>
+                                <select
+                                    required
+                                    className="form-input"
+                                    value={formData.customer_class}
+                                    onChange={handleChange('customer_class')}
+                                    style={{ appearance: 'auto' }}
+                                >
+                                    <option value="RESIDENT">Resident (Household)</option>
+                                    <option value="ORGANIZATION">Organization (Business/NGO)</option>
+                                    <option value="FACTORY">Factory / Industrial</option>
+                                    <option value="GOVERNMENT">Government Organization</option>
+                                    <option value="PUBLIC_SERVICE">Public Service</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="form-row">

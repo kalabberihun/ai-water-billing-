@@ -42,16 +42,25 @@ def generate_bill(self, reading_id):
             if consumption < 0:
                 consumption = Decimal('0')  # Handle meter reset
             
-            # Calculate by tiers
+            # Calculate by tiers (filtered by customer class)
             subtotal = Decimal('0')
             remaining = consumption
             
-            for tier in TariffTier.objects.all():
+            customer_class = reading.meter.customer.customer_class or 'RESIDENT'
+            tiers = TariffTier.objects.filter(customer_class=customer_class)
+            if not tiers.exists():
+                tiers = TariffTier.objects.filter(customer_class='RESIDENT')
+            
+            for tier in tiers:
                 if remaining <= 0:
                     break
                 tier_usage = min(remaining, tier.max_usage - tier.min_usage)
                 subtotal += tier_usage * tier.price_per_unit
                 remaining -= tier_usage
+            
+            # Add fixed base fee (e.g. meter maintenance fee)
+            base_fee = Decimal('5.00')
+            subtotal += base_fee
             
             # Tax calculation (example: 5%)
             tax_rate = Decimal('0.05')

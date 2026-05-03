@@ -94,7 +94,8 @@ const ClerkDashboard = () => {
                     <div style={{
                         background: 'var(--bg-card)', borderRadius: '20px', padding: '2rem',
                         width: '100%', maxWidth: '520px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-                        border: '1px solid var(--border-default)', animation: 'fadeIn 0.2s ease'
+                        border: '1px solid var(--border-default)', animation: 'fadeIn 0.2s ease',
+                        maxHeight: '90vh', overflowY: 'auto'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>Confirm Reading</h2>
