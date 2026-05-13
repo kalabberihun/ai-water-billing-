@@ -18,6 +18,7 @@ import ReportLeakage from './pages/ReportLeakage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PrivateRoute from './components/PrivateRoute';
 import SupportWidget from './components/SupportWidget';
+import DemoOCR from './pages/DemoOCR';
 
 // Shows landing page if not logged in, redirects to dashboard if logged in
 const HomeRedirect = () => {
@@ -45,6 +46,7 @@ function App() {
                 <Route path="/how-it-works" element={<HowItWorksPage />} />
                 <Route path="/why-us" element={<WhyUsPage />} />
                 <Route path="/about" element={<AboutUsPage />} />
+                <Route path="/demo-ocr" element={<DemoOCR />} />
                 <Route path="/dashboard" element={
                     <PrivateRoute>
                         <Dashboard />

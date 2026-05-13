@@ -6,6 +6,7 @@ from .views import (
     ChapaInitializeView, ChapaCallbackView, ChapaVerifyView,
     DisputeListView, DisputeCreateView, AdminDisputeUpdateView
 )
+from .chatbot import ChatbotView
 
 urlpatterns = [
     path('bills', BillListView.as_view(), name='bills'),
@@ -23,5 +24,7 @@ urlpatterns = [
     path('disputes', DisputeListView.as_view(), name='disputes-list'),
     path('disputes/create/', DisputeCreateView.as_view(), name='dispute-create'),
     path('disputes/<uuid:dispute_id>/resolve/', AdminDisputeUpdateView.as_view(), name='dispute-resolve'),
+    # AI Chatbot
+    path('chatbot/', ChatbotView.as_view(), name='chatbot'),
 ]
 

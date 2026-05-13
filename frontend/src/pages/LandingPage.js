@@ -120,6 +120,9 @@ const LandingPage = () => {
                         <Link to="/register" className="landing-btn-primary landing-btn-lg">
                             Get Started Free →
                         </Link>
+                        <Link to="/demo-ocr" className="landing-btn-ghost landing-btn-lg" style={{ border: '1px solid var(--primary-400)', color: 'var(--primary-400)' }}>
+                            🤖 Try Live Demo
+                        </Link>
                         <Link to="/features" className="landing-btn-ghost landing-btn-lg">
                             Learn More
                         </Link>

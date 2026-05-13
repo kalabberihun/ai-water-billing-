@@ -1,5 +1,7 @@
 import os
 import json
+import base64
+import logging
 import requests
 from io import BytesIO
 from PIL import Image
@@ -12,59 +14,149 @@ from google.genai import types
 
 from .models import MeterReading
 
-def extract_reading_gemini(image_url):
-    """Extract digits using Google Gemini 2.5 Flash Vision API"""
-    if not getattr(settings, 'GEMINI_API_KEY', None):
-        raise ValueError("GEMINI_API_KEY is not configured in settings.")
-        
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    
-    # Load image
+logger = logging.getLogger(__name__)
+
+GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+OCR_PROMPT = """
+You are an expert AI specialized in reading water meters with high precision.
+
+TASK: Analyze the provided image and extract the main water consumption reading.
+
+RULES:
+1. Focus ONLY on the mechanical or digital counter display showing cumulative consumption (cubic meters or gallons).
+2. Read ALL visible digits on the main register, including leading zeros if they are part of the counter.
+3. If the meter has a decimal/fractional portion (usually in red or a smaller dial), include it after a decimal point.
+4. IGNORE: serial numbers, barcodes, QR codes, model/brand text, calibration marks, and flow-rate indicators.
+5. If digits are partially obscured but can be reasonably inferred from context, include them with slightly lower confidence.
+6. If the image is too blurry, dark, or does not contain a water meter, return confidence 0.
+
+Return ONLY valid JSON:
+{"reading": <number>, "confidence": <float 0-1>}
+"""
+
+
+def _load_image(image_url):
+    """Load image from URL or local path, return PIL Image and raw bytes."""
     if image_url.startswith('http'):
         response = requests.get(image_url, timeout=30)
         img = Image.open(BytesIO(response.content))
+        img_bytes = response.content
     else:
-        # Convert local media URL to absolute file path
-        # e.g., /media/meter_readings/1/image.jpg -> C:\...\media\meter_readings\1\image.jpg
         relative_path = image_url.lstrip('/')
-        # Replace forward slashes with OS-specific separator just in case
         relative_path = relative_path.replace('/', os.sep)
         full_path = os.path.join(settings.BASE_DIR, relative_path)
         img = Image.open(full_path)
-            
-    prompt = """
-    You are an expert AI specialized in reading water meters with high precision.
-    
-    TASK: Analyze the provided image and extract the main water consumption reading.
-    
-    RULES:
-    1. Focus ONLY on the mechanical or digital counter display showing cumulative consumption (cubic meters or gallons).
-    2. Read ALL visible digits on the main register, including leading zeros if they are part of the counter.
-    3. If the meter has a decimal/fractional portion (usually in red or a smaller dial), include it after a decimal point.
-    4. IGNORE: serial numbers, barcodes, QR codes, model/brand text, calibration marks, and flow-rate indicators.
-    5. If digits are partially obscured but can be reasonably inferred from context, include them with slightly lower confidence.
-    6. If the image is too blurry, dark, or does not contain a water meter, return confidence 0.
-    
-    Return ONLY valid JSON:
-    {"reading": <number>, "confidence": <float 0-1>}
-    """
-    
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[img, prompt],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.1,
-        ),
-    )
-    
+        buf = BytesIO()
+        img.save(buf, format=img.format or 'JPEG')
+        img_bytes = buf.getvalue()
+    return img, img_bytes
+
+
+def _parse_ocr_result(text):
+    """Parse JSON reading from AI response text."""
+    import re
+    text = text.strip()
+    # Try direct JSON
     try:
-        data = json.loads(response.text)
-        reading = float(data.get('reading', 0))
-        confidence = float(data.get('confidence', 0))
-        return reading, confidence
-    except Exception as e:
-        raise ValueError(f"Failed to parse Gemini response: {response.text}") from e
+        data = json.loads(text)
+        if 'reading' in data:
+            return float(data['reading']), float(data.get('confidence', 0))
+    except json.JSONDecodeError:
+        pass
+    # Try markdown fences
+    if '```' in text:
+        code = text.split('```')[1]
+        if code.startswith('json'):
+            code = code[4:]
+        try:
+            data = json.loads(code.strip())
+            return float(data['reading']), float(data.get('confidence', 0))
+        except (json.JSONDecodeError, KeyError):
+            pass
+    # Try regex
+    match = re.search(r'\{[^{}]*"reading"\s*:\s*[\d.]+[^{}]*\}', text)
+    if match:
+        try:
+            data = json.loads(match.group())
+            return float(data['reading']), float(data.get('confidence', 0))
+        except (json.JSONDecodeError, KeyError):
+            pass
+    raise ValueError(f"Failed to parse OCR response: {text[:200]}")
+
+
+def extract_reading_gemini(image_url):
+    """Extract digits using Gemini (primary) with Groq fallback."""
+    img, img_bytes = _load_image(image_url)
+
+    # --- Try Gemini models first ---
+    if getattr(settings, 'GEMINI_API_KEY', None):
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[img, OCR_PROMPT],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1,
+                    ),
+                )
+                reading, confidence = _parse_ocr_result(response.text)
+                logger.info(f"OCR success via {model_name}: reading={reading}, confidence={confidence}")
+                return reading, confidence
+            except Exception as e:
+                if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
+                    logger.warning(f"Rate limited on {model_name}, trying next...")
+                    continue
+                logger.error(f"Gemini {model_name} error: {e}")
+                continue
+
+    # --- Fallback to Groq ---
+    groq_key = getattr(settings, 'GROQ_API_KEY', '')
+    if groq_key:
+        try:
+            b64_image = base64.b64encode(img_bytes).decode('utf-8')
+            content_type = 'image/jpeg'
+
+            res = requests.post(
+                GROQ_CHAT_URL,
+                headers={
+                    'Authorization': f'Bearer {groq_key}',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'model': 'meta-llama/llama-4-scout-17b-16e-instruct',
+                    'messages': [
+                        {
+                            'role': 'system',
+                            'content': 'You are a water meter OCR reader. Respond with ONLY JSON: {"reading": <number>, "confidence": <float 0-1>}'
+                        },
+                        {
+                            'role': 'user',
+                            'content': [
+                                {'type': 'image_url', 'image_url': {'url': f'data:{content_type};base64,{b64_image}'}},
+                                {'type': 'text', 'text': 'Read the water meter. Return ONLY JSON: {"reading": <number>, "confidence": <float 0-1>}'}
+                            ]
+                        }
+                    ],
+                    'max_tokens': 100,
+                    'temperature': 0.0,
+                },
+                timeout=45,
+            )
+
+            if res.status_code == 200:
+                text = res.json()['choices'][0]['message']['content'].strip()
+                reading, confidence = _parse_ocr_result(text)
+                logger.info(f"OCR success via Groq: reading={reading}, confidence={confidence}")
+                return reading, confidence
+            else:
+                logger.error(f"Groq OCR error {res.status_code}: {res.text[:200]}")
+        except Exception as e:
+            logger.error(f"Groq OCR failed: {e}")
+
+    raise ValueError("All AI models failed for OCR extraction")
 
 @shared_task(bind=True, max_retries=3, soft_time_limit=250)
 def process_ocr(self, reading_id):

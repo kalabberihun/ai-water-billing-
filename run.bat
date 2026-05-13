@@ -10,6 +10,9 @@ start "Django Server" cmd /k "cd backend && call venv\Scripts\activate.bat && py
 REM Start Celery Worker
 start "Celery Worker" cmd /k "cd backend && call venv\Scripts\activate.bat && celery -A config worker -l info --pool=solo"
 
+REM Start Celery Beat (scheduler for periodic tasks)
+start "Celery Beat" cmd /k "cd backend && call venv\Scripts\activate.bat && celery -A config beat -l info"
+
 REM Start React Frontend
 start "React Frontend" cmd /k "cd frontend && npm start"
 

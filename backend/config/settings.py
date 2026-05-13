@@ -174,6 +174,9 @@ CHAPA_API_BASE_URL = 'https://api.chapa.co/v1'
 # Google Gemini API
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
+# Groq API (fallback AI provider)
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+
 # Email (Gmail SMTP)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')

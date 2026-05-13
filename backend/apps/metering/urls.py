@@ -7,6 +7,7 @@ from .views import (
     AdminMaintenanceTaskView, TechnicianMaintenanceTaskView,
     CustomerLeakageReportView, AdminLeakageReportView
 )
+from .demo import DemoOCRView
 
 urlpatterns = [
     path('meters', MeterListView.as_view(), name='meters'),
@@ -24,4 +25,6 @@ urlpatterns = [
     path('leakage-reports', CustomerLeakageReportView.as_view(), name='customer-leakage-reports'),
     path('admin/leakage-reports', AdminLeakageReportView.as_view(), name='admin-leakage-reports'),
     path('admin/leakage-reports/<uuid:report_id>', AdminLeakageReportView.as_view(), name='admin-leakage-report-detail'),
+    # Live OCR Demo
+    path('demo-ocr/', DemoOCRView.as_view(), name='demo-ocr'),
 ]

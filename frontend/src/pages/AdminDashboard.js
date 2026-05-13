@@ -850,6 +850,50 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Export Data Panel */}
+            <div className="panel" style={{ marginTop: '2rem' }}>
+                <div className="panel-header">
+                    <h2 className="panel-title">📥 Export Data</h2>
+                </div>
+                <div className="panel-body">
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+                        Download system data as professionally formatted Excel spreadsheets.
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => {
+                                const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                                window.open(`${API}/api/analytics/export/bills/?token=${tokenObj?.access}`, '_blank');
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                            💰 Export Bills
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => {
+                                const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                                window.open(`${API}/api/analytics/export/customers/?token=${tokenObj?.access}`, '_blank');
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                            👥 Export Customers
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => {
+                                const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                                window.open(`${API}/api/analytics/export/anomalies/?token=${tokenObj?.access}`, '_blank');
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                            ⚠️ Export Anomalies
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 
