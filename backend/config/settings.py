@@ -126,6 +126,7 @@ CORS_ALLOWED_ORIGINS = [
 # Allow ngrok tunnel URLs for presentation/demo mode
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.ngrok-free\.app$",
+    r"^https://.*\.ngrok-free\.dev$",
     r"^https://.*\.ngrok\.io$",
 ]
 
