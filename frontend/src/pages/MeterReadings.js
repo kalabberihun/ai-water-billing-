@@ -107,7 +107,10 @@ const MeterReadings = () => {
     };
 
     const pollStatus = (readingId) => {
+        let pollCount = 0;
+        const maxPolls = 30; // ~90 seconds max
         const intervalId = setInterval(async () => {
+            pollCount++;
             try {
                 const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/metering/readings/${readingId}/status`);
                 const { status, message } = res.data;
@@ -123,9 +126,21 @@ const MeterReadings = () => {
                     setUploadStatus('error');
                     setUploadMessage(message || 'OCR Processing failed');
                     setIsUploading(false);
+                } else if (pollCount >= maxPolls) {
+                    clearInterval(intervalId);
+                    setUploadStatus('success');
+                    setUploadMessage('Processing is taking longer than expected. Your reading has been submitted and will be processed shortly.');
+                    setIsUploading(false);
+                    setTimeout(() => window.location.reload(), 3000);
                 }
             } catch (err) {
                 console.error("Polling error", err);
+                if (pollCount >= maxPolls) {
+                    clearInterval(intervalId);
+                    setUploadStatus('error');
+                    setUploadMessage('Could not confirm processing status. Please refresh the page.');
+                    setIsUploading(false);
+                }
             }
         }, 3000);
     };

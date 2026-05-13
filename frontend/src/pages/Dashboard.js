@@ -57,7 +57,7 @@ const Dashboard = () => {
     }, [user, navigate]);
 
     const stats = [
-        { label: 'Current Balance', value: dashboardData.balance, currency: 'ETB', icon: '💰', color: 'blue' },
+        { label: 'Current Balance Due', value: dashboardData.balance, currency: 'ETB', icon: '💰', color: 'blue' },
         { label: 'Last Reading', value: dashboardData.last_reading, unit: 'm³', icon: '🔍', color: 'teal' },
         { label: 'Monthly Usage', value: dashboardData.monthly_usage, unit: 'm³', icon: '📊', color: 'amber' },
         { label: 'Days to Due', value: dashboardData.days_to_due, unit: 'Days', icon: '📅', color: 'rose' },
@@ -148,26 +148,6 @@ const Dashboard = () => {
                                         </div>
                                         <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#2dd4bf', lineHeight: 1 }}>
                                             <span style={{ fontSize: '1rem', color: 'var(--text-tertiary)' }}>ETB</span> {prediction.estimated_cost}
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{
-                                            width: '50px',
-                                            height: '50px',
-                                            borderRadius: '12px',
-                                            background: prediction.trend === 'UP' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '1.5rem'
-                                        }}>
-                                            {prediction.trend === 'UP' ? '📈' : prediction.trend === 'DOWN' ? '📉' : '↔️'}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                                {prediction.trend === 'UP' ? 'Rising Trend' : prediction.trend === 'DOWN' ? 'Usage Dropping' : 'Stable Usage'}
-                                            </div>
-                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Based on last 6 months</div>
                                         </div>
                                     </div>
                                 </div>

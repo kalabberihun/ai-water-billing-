@@ -129,11 +129,17 @@ class ReadingStatusView(APIView):
             if not hasattr(request.user, 'customer') or request.user.customer != reading.meter.customer:
                 return Response({'error': 'Unauthorized'}, status=403)
                 
+        status_messages = {
+            'PENDING': 'Queued for AI processing...',
+            'PROCESSING': 'AI is analyzing the image...',
+        }
+        msg = status_messages.get(reading.status, 'Processing complete')
+        
         return Response({
             'status': reading.status,
             'reading_value': reading.reading_value,
             'confidence': reading.ocr_confidence,
-            'message': 'Processing complete' if reading.status != 'PENDING' else 'AI is analyzing the image...'
+            'message': msg
         })
 
 class VerifyReadingView(APIView):

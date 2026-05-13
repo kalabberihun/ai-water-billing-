@@ -13,7 +13,7 @@ from google.genai import types
 from .models import MeterReading
 
 def extract_reading_gemini(image_url):
-    """Extract digits using Google Gemini Vision API"""
+    """Extract digits using Google Gemini 2.5 Flash Vision API"""
     if not getattr(settings, 'GEMINI_API_KEY', None):
         raise ValueError("GEMINI_API_KEY is not configured in settings.")
         
@@ -33,19 +33,28 @@ def extract_reading_gemini(image_url):
         img = Image.open(full_path)
             
     prompt = """
-    You are an expert AI trained to read water meters. 
-    Analyze the provided image of a water meter and extract the main consumption reading (the numbers).
-    Ignore serial numbers, barcodes, or model numbers. Focus ONLY on the actual consumption digits (often in a prominent row or counter).
-    Return your answer in strictly formatted JSON without any other text:
-    {"reading": 1234.5, "confidence": 0.95}
-    If you cannot read the meter at all, return a confidence of 0 and reading of 0.
+    You are an expert AI specialized in reading water meters with high precision.
+    
+    TASK: Analyze the provided image and extract the main water consumption reading.
+    
+    RULES:
+    1. Focus ONLY on the mechanical or digital counter display showing cumulative consumption (cubic meters or gallons).
+    2. Read ALL visible digits on the main register, including leading zeros if they are part of the counter.
+    3. If the meter has a decimal/fractional portion (usually in red or a smaller dial), include it after a decimal point.
+    4. IGNORE: serial numbers, barcodes, QR codes, model/brand text, calibration marks, and flow-rate indicators.
+    5. If digits are partially obscured but can be reasonably inferred from context, include them with slightly lower confidence.
+    6. If the image is too blurry, dark, or does not contain a water meter, return confidence 0.
+    
+    Return ONLY valid JSON:
+    {"reading": <number>, "confidence": <float 0-1>}
     """
     
     response = client.models.generate_content(
-        model='gemini-flash-latest',
+        model='gemini-2.5-flash',
         contents=[img, prompt],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
+            temperature=0.1,
         ),
     )
     
@@ -88,7 +97,7 @@ def process_ocr(self, reading_id):
                 reading.status = 'MANUAL_REVIEW'
         else:
             reading.status = 'MANUAL_REVIEW'
-            reading.notes = 'Low OCR confidence or no digits detected by Gemini'
+            reading.notes = 'Low OCR confidence or no digits detected by Gemini 2.5 Flash'
             
         reading.processed_at = timezone.now()
         reading.save()
