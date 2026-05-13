@@ -123,12 +123,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-# Allow ngrok tunnel URLs for presentation/demo mode
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.ngrok-free\.app$",
-    r"^https://.*\.ngrok-free\.dev$",
-    r"^https://.*\.ngrok\.io$",
-]
 
 # JWT Configuration (RS256)
 JWT_ALGORITHM = 'RS256'
