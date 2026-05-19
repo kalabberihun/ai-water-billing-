@@ -47,7 +47,7 @@ const Login = () => {
                     )}
 
                     {successMessage && (
-                        <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: '#10b981', color: '#10b981' }}>
+                        <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: 'var(--color-success)', color: 'var(--color-success)' }}>
                             <span>✅</span>
                             <span>{successMessage}</span>
                         </div>
@@ -70,7 +70,7 @@ const Login = () => {
                         <div className="form-group">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
-                                <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: 'var(--primary-400)', textDecoration: 'none' }}>
+                                <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: 'var(--color-accent)', textDecoration: 'none' }}>
                                     Forgot password?
                                 </Link>
                             </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import LandingPage, { FeaturesPage, HowItWorksPage, WhyUsPage, AboutUsPage } from './pages/LandingPage';
@@ -33,6 +33,11 @@ const HomeRedirect = () => {
 };
 
 function App() {
+    useEffect(() => {
+        const saved = localStorage.getItem('appTheme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+    }, []);
+
     return (
         <Router>
             <Routes>
@@ -100,6 +105,11 @@ function App() {
                 <Route path="/admin/roles" element={
                     <PrivateRoute>
                         <AdminDashboard section="roles" />
+                    </PrivateRoute>
+                } />
+                <Route path="/admin/exports" element={
+                    <PrivateRoute>
+                        <AdminDashboard section="exports" />
                     </PrivateRoute>
                 } />
                 <Route path="/admin/system" element={

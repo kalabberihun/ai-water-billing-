@@ -164,7 +164,7 @@ const VerifyEmail = () => {
                     )}
 
                     {resendMsg && (
-                        <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: '#10b981', color: '#10b981' }}>
+                        <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: 'var(--color-success)', color: 'var(--color-success)' }}>
                             <span>✅</span>
                             <span>{resendMsg}</span>
                         </div>

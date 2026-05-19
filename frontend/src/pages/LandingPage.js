@@ -120,7 +120,7 @@ const LandingPage = () => {
                         <Link to="/register" className="landing-btn-primary landing-btn-lg">
                             Get Started Free →
                         </Link>
-                        <Link to="/demo-ocr" className="landing-btn-ghost landing-btn-lg" style={{ border: '1px solid var(--primary-400)', color: 'var(--primary-400)' }}>
+                        <Link to="/demo-ocr" className="landing-btn-ghost landing-btn-lg" style={{ border: '1px solid var(--color-accent)', color: 'var(--color-accent)' }}>
                             🤖 Try Live Demo
                         </Link>
                         <Link to="/features" className="landing-btn-ghost landing-btn-lg">
@@ -175,7 +175,7 @@ const LandingPage = () => {
                             <div className="landing-step-icon">{card.icon}</div>
                             <h3 className="landing-step-title">{card.title}</h3>
                             <p className="landing-step-desc">{card.desc}</p>
-                            <div style={{ marginTop: '1rem', color: 'var(--primary-400)', fontWeight: 600, fontSize: '0.9rem' }}>
+                            <div style={{ marginTop: '1rem', color: 'var(--color-accent)', fontWeight: 600, fontSize: '0.9rem' }}>
                                 Learn more →
                             </div>
                         </Link>
@@ -225,7 +225,7 @@ const FeaturesPage = () => {
                         {
                             icon: '⚖️', title: 'Dispute Management',
                             desc: 'Built-in dispute resolution system. Customers can flag incorrect bills, and admins can review and resolve efficiently.',
-                            color: '#ef4444'
+                            color: 'var(--color-danger)'
                         },
                         {
                             icon: '🔧', title: 'Field Maintenance',
@@ -302,7 +302,7 @@ const HowItWorksPage = () => {
                         { icon: '🧠', title: 'AI Confidence Score', desc: 'Each reading gets a confidence score. High-confidence readings are auto-verified; low ones go to manual review.', color: '#14b8a6' },
                         { icon: '👨‍💼', title: 'Clerk Review', desc: 'Readings needing manual review are batch-assigned to clerks who verify values and approve them.', color: '#f59e0b' },
                         { icon: '📊', title: 'Consumption Calculation', desc: 'The system computes consumption by comparing current and previous readings, applying tiered pricing automatically.', color: '#8b5cf6' },
-                        { icon: '📧', title: 'Customer Notification', desc: 'Customers receive alerts about new bills, usage spikes, and possible leaks via the in-app notification system.', color: '#ef4444' },
+                        { icon: '📧', title: 'Customer Notification', desc: 'Customers receive alerts about new bills, usage spikes, and possible leaks via the in-app notification system.', color: 'var(--color-danger)' },
                         { icon: '💳', title: 'Payment Processing', desc: 'Customers pay online via Chapa. Payments are reconciled automatically and receipts are generated.', color: '#10b981' },
                     ].map((item, i) => (
                         <div key={i} className="landing-feature-card" style={{ '--accent': item.color }}>
@@ -393,7 +393,7 @@ const WhyUsPage = () => {
                         { icon: '🎯', title: 'High Accuracy', desc: '80% accuracy rate on meter reading extraction. Low-confidence reads are automatically flagged for human review.', color: '#14b8a6' },
                         { icon: '💡', title: 'Easy to Use', desc: 'Intuitive interface designed for every role. No training needed — your team can start using it on day one.', color: '#f59e0b' },
                         { icon: '🔒', title: 'Secure & Reliable', desc: 'JWT authentication, encrypted data, role-based access control, and 24/7 uptime monitoring.', color: '#8b5cf6' },
-                        { icon: '📈', title: 'Leak Detection', desc: 'AI analyzes consumption patterns and alerts customers and admins about potential leaks before they become costly.', color: '#ef4444' },
+                        { icon: '📈', title: 'Leak Detection', desc: 'AI analyzes consumption patterns and alerts customers and admins about potential leaks before they become costly.', color: 'var(--color-danger)' },
                         { icon: '🌍', title: 'Built for Scale', desc: 'Whether you serve 100 or 100,000 customers, our platform scales effortlessly with your growing utility.', color: '#10b981' },
                     ].map((item, i) => (
                         <div key={i} className="landing-feature-card" style={{ '--accent': item.color }}>
@@ -467,7 +467,7 @@ const AboutUsPage = () => {
                         <div key={i} className="landing-feature-card" style={{ '--accent': member.color, textAlign: 'center' }}>
                             <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>{member.icon}</div>
                             <h3 className="landing-feature-title">{member.name}</h3>
-                            <div style={{ color: 'var(--primary-400)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>{member.role}</div>
+                            <div style={{ color: 'var(--color-accent)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>{member.role}</div>
                             <p className="landing-feature-desc">{member.desc}</p>
                         </div>
                     ))}
@@ -500,7 +500,7 @@ const AboutUsPage = () => {
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
                                 {contact.label}
                             </div>
-                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary-400)' }}>
+                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-accent)' }}>
                                 {contact.value}
                             </div>
                         </a>

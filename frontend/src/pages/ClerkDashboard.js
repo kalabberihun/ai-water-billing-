@@ -9,12 +9,21 @@ const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ClerkDashboard = () => {
     const user = useSelector((state) => state.auth.user);
     const [pendingReadings, setPendingReadings] = useState([]);
+    const [fieldTasks, setFieldTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [verifyingId, setVerifyingId] = useState(null);
     const [reviewModal, setReviewModal] = useState(null);
     const [reviewValue, setReviewValue] = useState('');
     const [reviewError, setReviewError] = useState('');
     const [successCount, setSuccessCount] = useState(0);
+
+    // Field Task Submission State
+    const [fieldTaskModal, setFieldTaskModal] = useState(null);
+    const [fieldTaskImage, setFieldTaskImage] = useState(null);
+    const [fieldTaskPreview, setFieldTaskPreview] = useState('');
+    const [fieldTaskValue, setFieldTaskValue] = useState('');
+    const [fieldTaskError, setFieldTaskError] = useState('');
+    const [fieldTaskSubmitting, setFieldTaskSubmitting] = useState(false);
 
     const getConfig = () => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
@@ -24,8 +33,12 @@ const ClerkDashboard = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`${API}/api/metering/clerk/pending-readings`, getConfig());
-            setPendingReadings(res.data);
+            const [pendingRes, fieldRes] = await Promise.all([
+                axios.get(`${API}/api/metering/clerk/pending-readings`, getConfig()),
+                axios.get(`${API}/api/metering/clerk/field-tasks`, getConfig())
+            ]);
+            setPendingReadings(pendingRes.data);
+            setFieldTasks(fieldRes.data);
         } catch (error) {
             console.error('Error fetching clerk data:', error);
         } finally {
@@ -69,12 +82,70 @@ const ClerkDashboard = () => {
         }
     };
 
+    // ── Field Task Handlers ──────────────────────────────────────────────────
+    const openFieldTask = (task) => {
+        setFieldTaskModal(task);
+        setFieldTaskImage(null);
+        setFieldTaskPreview('');
+        setFieldTaskValue('');
+        setFieldTaskError('');
+    };
+
+    const closeFieldTask = () => {
+        setFieldTaskModal(null);
+        setFieldTaskImage(null);
+        setFieldTaskPreview('');
+        setFieldTaskValue('');
+        setFieldTaskError('');
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFieldTaskImage(file);
+            const url = URL.createObjectURL(file);
+            setFieldTaskPreview(url);
+        }
+    };
+
+    const submitFieldTask = async () => {
+        if (!fieldTaskImage) {
+            setFieldTaskError('Please upload a photo of the meter.');
+            return;
+        }
+        if (!fieldTaskValue || isNaN(parseFloat(fieldTaskValue)) || parseFloat(fieldTaskValue) < 0) {
+            setFieldTaskError('Please enter a valid positive meter reading.');
+            return;
+        }
+
+        setFieldTaskSubmitting(true);
+        const formData = new FormData();
+        formData.append('image', fieldTaskImage);
+        formData.append('reading_value', fieldTaskValue);
+
+        try {
+            await axios.post(`${API}/api/metering/clerk/field-tasks/${fieldTaskModal.id}/submit`, formData, {
+                headers: {
+                    ...getConfig().headers,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            setSuccessCount(c => c + 1);
+            closeFieldTask();
+            fetchData();
+        } catch (error) {
+            setFieldTaskError('Failed to submit reading: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setFieldTaskSubmitting(false);
+        }
+    };
+
     // Time remaining helpers
     const getTimeLeft = (mins) => Math.max(0, 60 - Math.floor(mins));
     const getUrgency = (mins) => {
-        if (mins > 50) return { color: '#ef4444', label: 'Urgent' };
+        if (mins > 50) return { color: 'var(--color-danger)', label: 'Urgent' };
         if (mins > 35) return { color: '#f59e0b', label: 'Soon' };
-        return { color: '#10b981', label: 'On time' };
+        return { color: 'var(--color-success)', label: 'On time' };
     };
 
     const urgentCount = pendingReadings.filter(r => r.assigned_duration_mins > 50).length;
@@ -85,18 +156,8 @@ const ClerkDashboard = () => {
 
             {/* ── Review Modal ──────────────────────────────────────────── */}
             {reviewModal && (
-                <div style={{
-                    position: 'fixed', inset: 0,
-                    background: 'rgba(0,0,0,0.7)',
-                    zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-card)', borderRadius: '20px', padding: '2rem',
-                        width: '100%', maxWidth: '520px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-                        border: '1px solid var(--border-default)', animation: 'fadeIn 0.2s ease',
-                        maxHeight: '90vh', overflowY: 'auto'
-                    }}>
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '520px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>Confirm Reading</h2>
                             <button
@@ -129,17 +190,17 @@ const ClerkDashboard = () => {
                                 <SecureImage
                                     src={reviewModal.image_url.startsWith('http') ? reviewModal.image_url : `${API}${reviewModal.image_url}`}
                                     alt="Meter reading"
-                                    style={{ width: '100%', maxHeight: '360px', objectFit: 'contain', background: '#0a0a0a' }}
+                                    style={{ width: '100%', maxHeight: '360px', objectFit: 'contain', background: 'var(--color-primary)' }}
                                 />
                                 <div style={{
                                     position: 'absolute', bottom: 0, left: 0, right: 0,
                                     background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
                                     padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                 }}>
-                                    <span style={{ color: '#fff', fontSize: '0.85rem' }}>📷 Meter Photo</span>
+                                    <span style={{ color: 'var(--color-text-inverse)', fontSize: '0.85rem' }}>📷 Meter Photo</span>
                                     {reviewModal.ocr_confidence && (
                                         <span style={{
-                                            background: 'rgba(245,158,11,0.9)', color: '#000',
+                                            background: 'rgba(245,158,11,0.9)', color: 'var(--color-text)',
                                             borderRadius: '9999px', padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700
                                         }}>
                                             AI: {Math.round(reviewModal.ocr_confidence * 100)}% confident
@@ -179,7 +240,7 @@ const ClerkDashboard = () => {
                                     onClick={() => setReviewValue(String(reviewModal.reading_value))}
                                     style={{
                                         marginTop: '0.4rem', background: 'none', border: 'none',
-                                        color: 'var(--accent-400)', fontSize: '0.8rem', cursor: 'pointer', padding: 0
+                                        color: 'var(--color-accent)', fontSize: '0.8rem', cursor: 'pointer', padding: 0
                                     }}
                                 >
                                     Use AI value ({reviewModal.reading_value})
@@ -191,7 +252,7 @@ const ClerkDashboard = () => {
                             <div style={{
                                 background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444',
                                 borderRadius: '8px', padding: '0.6rem 1rem',
-                                color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem'
+                                color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem'
                             }}>{reviewError}</div>
                         )}
 
@@ -220,6 +281,112 @@ const ClerkDashboard = () => {
                 </div>
             )}
 
+            {/* ── Field Task Submit Modal ──────────────────────────────────────────── */}
+            {fieldTaskModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '520px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>Submit Field Reading</h2>
+                            <button
+                                onClick={closeFieldTask}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1 }}
+                            >×</button>
+                        </div>
+
+                        <div style={{
+                            display: 'flex', gap: '1rem', marginBottom: '1.25rem',
+                            background: 'var(--bg-body)', borderRadius: '10px', padding: '0.75rem 1rem',
+                            border: '1px solid var(--border-default)'
+                        }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Customer</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{fieldTaskModal.customer}</div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{fieldTaskModal.address}</div>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Meter</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{fieldTaskModal.meter}</div>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '0.5rem' }}>
+                                1. Upload Meter Photo
+                            </label>
+                            {fieldTaskPreview ? (
+                                <div style={{ position: 'relative', marginBottom: '0.5rem', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-default)' }}>
+                                    <img src={fieldTaskPreview} alt="Preview" style={{ width: '100%', maxHeight: '250px', objectFit: 'contain', background: 'var(--color-primary)' }} />
+                                    <button 
+                                        onClick={() => { setFieldTaskImage(null); setFieldTaskPreview(''); }}
+                                        style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(239,68,68,0.9)', color: 'var(--color-text-inverse)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer' }}
+                                    >✕</button>
+                                </div>
+                            ) : (
+                                <div style={{ 
+                                    border: '2px dashed var(--border-default)', borderRadius: '12px', padding: '2rem',
+                                    textAlign: 'center', background: 'var(--bg-body)', cursor: 'pointer' 
+                                }} onClick={() => document.getElementById('field-img-upload').click()}>
+                                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📷</div>
+                                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Click to capture or upload photo</div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.2rem' }}>Must be clear and readable</div>
+                                    <input 
+                                        id="field-img-upload" type="file" accept="image/*" capture="environment" 
+                                        onChange={handleImageChange} style={{ display: 'none' }} 
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '0.5rem' }}>
+                                2. Manual Reading Value (m³)
+                            </label>
+                            <input
+                                type="number" min="0" step="0.01" value={fieldTaskValue}
+                                onChange={e => { setFieldTaskValue(e.target.value); setFieldTaskError(''); }}
+                                placeholder="Enter exactly what you see on the meter..."
+                                style={{
+                                    width: '100%', padding: '0.875rem 1rem', borderRadius: '10px',
+                                    border: fieldTaskError.includes('reading') ? '1px solid #ef4444' : '1px solid var(--border-default)',
+                                    background: 'var(--bg-body)', color: 'var(--text-primary)',
+                                    fontSize: '1.1rem', fontWeight: 600, boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        {fieldTaskError && (
+                            <div style={{
+                                background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444',
+                                borderRadius: '8px', padding: '0.6rem 1rem',
+                                color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem'
+                            }}>{fieldTaskError}</div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={closeFieldTask}
+                                style={{ flex: 1 }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={submitFieldTask}
+                                disabled={fieldTaskSubmitting || !fieldTaskImage || !fieldTaskValue}
+                                style={{
+                                    flex: 2,
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    opacity: (!fieldTaskImage || !fieldTaskValue) ? 0.5 : 1
+                                }}
+                            >
+                                {fieldTaskSubmitting ? '⏳ Submitting...' : '✓ Submit Reading'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className="main-content">
                 <header className="content-header">
                     <div>
@@ -238,7 +405,12 @@ const ClerkDashboard = () => {
                         <div className="stat-card">
                             <div className="stat-icon amber">📋</div>
                             <div className="stat-value">{pendingReadings.length}</div>
-                            <div className="stat-label">Assigned to You</div>
+                            <div className="stat-label">AI Reviews Assigned</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-icon blue">📍</div>
+                            <div className="stat-value">{fieldTasks.length}</div>
+                            <div className="stat-label">Field Tasks Assigned</div>
                         </div>
                         <div className="stat-card">
                             <div className="stat-icon rose">⚠️</div>
@@ -249,7 +421,7 @@ const ClerkDashboard = () => {
                         </div>
                         <div className="stat-card">
                             <div className="stat-icon teal">✔️</div>
-                            <div className="stat-value" style={{ color: '#10b981' }}>{successCount}</div>
+                            <div className="stat-value" style={{ color: 'var(--color-success)' }}>{successCount}</div>
                             <div className="stat-label">Approved This Session</div>
                         </div>
                         <div className="stat-card">
@@ -273,7 +445,7 @@ const ClerkDashboard = () => {
                         }}>
                             <div style={{ fontSize: '1.5rem' }}>🚨</div>
                             <div>
-                                <div style={{ fontWeight: 700, color: '#ef4444' }}>
+                                <div style={{ fontWeight: 700, color: 'var(--color-danger)' }}>
                                     {urgentCount} reading{urgentCount > 1 ? 's' : ''} expiring soon!
                                 </div>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -290,7 +462,7 @@ const ClerkDashboard = () => {
                                 Your Assignment Queue
                                 {pendingReadings.length > 0 && (
                                     <span style={{
-                                        marginLeft: '0.75rem', background: '#f59e0b', color: '#000',
+                                        marginLeft: '0.75rem', background: '#f59e0b', color: 'var(--color-text)',
                                         borderRadius: '9999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700
                                     }}>{pendingReadings.length}</span>
                                 )}
@@ -380,6 +552,59 @@ const ClerkDashboard = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* ── Field Tasks Queue ──────────────────────────────────── */}
+                    {fieldTasks.length > 0 && (
+                        <div className="panel" style={{ marginTop: '2rem' }}>
+                            <div className="panel-header">
+                                <h2 className="panel-title">
+                                    Your Field Tasks
+                                    <span style={{
+                                        marginLeft: '0.75rem', background: '#3b82f6', color: 'var(--color-text-inverse)',
+                                        borderRadius: '9999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700
+                                    }}>{fieldTasks.length}</span>
+                                </h2>
+                            </div>
+                            <div className="panel-body" style={{ padding: 0 }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Customer & Location</th>
+                                            <th>Meter</th>
+                                            <th>Assigned At</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {fieldTasks.map(task => (
+                                            <tr key={task.id}>
+                                                <td>
+                                                    <div style={{ fontWeight: 600 }}>{task.customer}</div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{task.address}</div>
+                                                </td>
+                                                <td><code style={{ fontSize: '0.85rem' }}>{task.meter}</code></td>
+                                                <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                    {task.assigned_at}
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        style={{
+                                                            padding: '6px 16px',
+                                                            background: 'var(--color-accent)'
+                                                        }}
+                                                        onClick={() => openFieldTask(task)}
+                                                    >
+                                                        📍 Take Reading
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </main>

@@ -155,7 +155,7 @@ class ExportCustomerListView(QueryTokenMixin, APIView):
             ws.cell(row=idx, column=3, value=cust.phone or 'N/A')
             ws.cell(row=idx, column=4, value=cust.customer_class or 'RESIDENT')
             ws.cell(row=idx, column=5, value='Yes' if cust.user and cust.user.is_active else 'No')
-            ws.cell(row=idx, column=6, value=cust.user.date_joined.strftime('%Y-%m-%d') if cust.user else 'N/A')
+            ws.cell(row=idx, column=6, value=cust.user.created_at.strftime('%Y-%m-%d') if cust.user else 'N/A')
             ws.cell(row=idx, column=7, value=meter_count)
 
         filename = f'AquaBill_Customers_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'

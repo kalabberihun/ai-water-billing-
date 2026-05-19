@@ -88,7 +88,7 @@ const AdminLeakageReports = () => {
     const urgencyColors = {
         LOW: { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981', icon: '🟢' },
         MEDIUM: { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', icon: '🟡' },
-        HIGH: { bg: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', icon: '🟠' },
+        HIGH: { bg: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', icon: '🟠' },
         CRITICAL: { bg: 'rgba(220, 38, 38, 0.15)', color: '#dc2626', icon: '🔴' },
     };
 
@@ -116,7 +116,7 @@ const AdminLeakageReports = () => {
 
                 <div className="content-body">
                     {success && (
-                        <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: '#10b981', color: '#10b981', marginBottom: '1.5rem' }}>
+                        <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: 'var(--color-success)', color: 'var(--color-success)', marginBottom: '1.5rem' }}>
                             <span>✅</span><span>{success}</span>
                         </div>
                     )}
@@ -218,7 +218,7 @@ const ReportRow = ({ report, technicians, onUpdate, urgencyColors, statusColors 
                     {report.description}
                 </div>
                 {report.admin_notes && !isEditing && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--primary-400)', background: 'rgba(59, 130, 246, 0.05)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--color-accent)', background: 'rgba(59, 130, 246, 0.05)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
                         <strong>Note:</strong> {report.admin_notes}
                     </div>
                 )}

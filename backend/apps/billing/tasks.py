@@ -131,19 +131,19 @@ def generate_bill(self, reading_id):
 
 @shared_task
 def delete_expired_bills():
-    """Deletes bills that are older than 24 hours to keep the system clean"""
+    """Deletes bills that are older than 2 hours to keep the system clean"""
     from django.utils import timezone
     from datetime import timedelta
     from .models import Bill
     import logging
 
     logger = logging.getLogger(__name__)
-    expiration_time = timezone.now() - timedelta(hours=24)
+    expiration_time = timezone.now() - timedelta(hours=2)
     # Only delete bills that haven't been paid
     expired_bills = Bill.objects.filter(created_at__lt=expiration_time, status__in=['UNPAID', 'OVERDUE'])
     
     count = expired_bills.count()
     if count > 0:
         expired_bills.delete()
-        logger.info(f"Successfully deleted {count} bills older than 24 hours.")
+        logger.info(f"Successfully deleted {count} bills older than 2 hours.")
     return {'deleted_count': count}

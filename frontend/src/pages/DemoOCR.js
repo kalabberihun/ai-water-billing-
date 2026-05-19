@@ -128,7 +128,7 @@ const DemoOCR = () => {
                     <div className="landing-nav-links">
                         <Link to="/features">Features</Link>
                         <Link to="/how-it-works">How It Works</Link>
-                        <Link to="/demo-ocr" style={{ color: 'var(--primary-400)' }}>Live Demo</Link>
+                        <Link to="/demo-ocr" style={{ color: 'var(--color-accent)' }}>Live Demo</Link>
                     </div>
                     <div className="landing-nav-actions">
                         <ThemeToggle style={{ position: 'relative', top: 'auto', right: 'auto', zIndex: 1, boxShadow: 'none' }} />

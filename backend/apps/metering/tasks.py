@@ -276,6 +276,63 @@ def reassign_expired_reviews():
     return f"Reassigned {reassigned} expiring reviews"
 
 @shared_task
+def reassign_expired_field_tasks():
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.metering.models import MeterReading
+    from apps.accounts.models import User
+    from utils.email import send_html_email
+    
+    cutoff = timezone.now() - timedelta(hours=24)
+    expired = MeterReading.objects.filter(status='FIELD_TASK', assigned_at__lt=cutoff).exclude(assigned_to__isnull=True)
+    
+    if not expired.exists():
+        return "No expired field tasks"
+        
+    clerks = list(User.objects.filter(role__name__iexact='CLERK'))
+    if not clerks:
+        expired.update(assigned_to=None, assigned_at=None)
+        return "Unassigned expired field tasks (no clerk found)"
+        
+    import random
+    reassigned = 0
+    for r in expired:
+        old_clerk = r.assigned_to
+        available_clerks = [c for c in clerks if c != old_clerk] or clerks
+        new_clerk = random.choice(available_clerks)
+        
+        r.assigned_to = new_clerk
+        r.assigned_at = timezone.now()
+        r.save()
+        reassigned += 1
+        
+        from apps.accounts.models import SystemNotification
+        
+        SystemNotification.objects.create(
+            user=new_clerk,
+            alert_type='TASK',
+            message=f'An expired field task for meter {r.meter.meter_number} has been reassigned to you. Please visit the location.'
+        )
+        
+        try:
+            send_html_email(
+                subject='Reassigned Field Task',
+                template_name='emails/task_assigned.html',
+                context={
+                    'name': new_clerk.first_name or 'Clerk',
+                    'task_type': 'field check task',
+                    'meter_number': r.meter.meter_number,
+                    'message': f'An expired field task for meter {r.meter.meter_number} has been reassigned to you. Please visit the location.'
+                },
+                recipient_list=[new_clerk.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+            
+    return f"Reassigned {reassigned} expiring field tasks"
+
+@shared_task
 def delete_resolved_leakage_reports():
     from datetime import timedelta
     from django.utils import timezone

@@ -90,16 +90,8 @@ const TechnicianDashboard = () => {
 
             {/* ── Resolve Modal ──────────────────────────────────────────── */}
             {resolveModal && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-                    zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-card)', borderRadius: '20px', padding: '2rem',
-                        width: '100%', maxWidth: '500px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-                        border: '1px solid var(--border-default)', animation: 'fadeIn 0.2s ease'
-                    }}>
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '500px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>Update Maintenance Task</h2>
                             <button onClick={closeResolve} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1 }}>×</button>
@@ -166,7 +158,7 @@ const TechnicianDashboard = () => {
                         />
 
                         {errorMsg && (
-                            <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{errorMsg}</div>
+                            <div style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{errorMsg}</div>
                         )}
 
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -174,7 +166,7 @@ const TechnicianDashboard = () => {
                             <button 
                                 className="btn btn-primary" 
                                 onClick={handleSubmit} 
-                                style={{ flex: 2, background: 'var(--accent-500)' }} 
+                                style={{ flex: 2, background: 'var(--color-accent)' }} 
                                 disabled={submitting}
                             >
                                 {submitting ? 'Saving...' : 'Save Update'}
@@ -210,7 +202,7 @@ const TechnicianDashboard = () => {
                         </div>
                         <div className="stat-card">
                             <div className="stat-icon teal">✅</div>
-                            <div className="stat-value" style={{ color: '#10b981' }}>{resolvedTasks}</div>
+                            <div className="stat-value" style={{ color: 'var(--color-success)' }}>{resolvedTasks}</div>
                             <div className="stat-label">Resolved Tasks</div>
                         </div>
                     </div>
@@ -266,7 +258,7 @@ const TechnicianDashboard = () => {
                                                     <button 
                                                         className="btn btn-sm" 
                                                         onClick={() => handleDeleteTask(task.id)}
-                                                        style={{ marginLeft: '0.5rem', padding: '4px 8px', fontSize: '0.8rem', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', cursor: 'pointer', borderRadius: '4px' }}
+                                                        style={{ marginLeft: '0.5rem', padding: '4px 8px', fontSize: '0.8rem', background: 'transparent', border: '1px solid #ef4444', color: 'var(--color-danger)', cursor: 'pointer', borderRadius: '4px' }}
                                                     >
                                                         Delete
                                                     </button>

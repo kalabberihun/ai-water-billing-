@@ -119,7 +119,7 @@ const ResetPassword = () => {
                                 background: 'rgba(239, 68, 68, 0.1)',
                                 borderLeft: '4px solid #ef4444',
                                 borderRadius: 'var(--radius-sm)',
-                                color: '#ef4444',
+                                color: 'var(--color-danger)',
                                 fontSize: '0.85rem'
                             }}>
                                 {errorMessage}

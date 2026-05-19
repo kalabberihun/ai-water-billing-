@@ -76,12 +76,12 @@ const ReportLeakage = () => {
     const urgencyColors = {
         LOW: { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981', icon: '🟢' },
         MEDIUM: { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', icon: '🟡' },
-        HIGH: { bg: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', icon: '🟠' },
+        HIGH: { bg: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', icon: '🟠' },
         CRITICAL: { bg: 'rgba(220, 38, 38, 0.15)', color: '#dc2626', icon: '🔴' },
     };
 
     const statusColors = {
-        SUBMITTED: { bg: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' },
+        SUBMITTED: { bg: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' },
         UNDER_REVIEW: { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' },
         DISPATCHED: { bg: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' },
         RESOLVED: { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981' },
@@ -112,7 +112,7 @@ const ReportLeakage = () => {
                         </div>
                         <div className="panel-body">
                             {success && (
-                                <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: '#10b981', color: '#10b981', marginBottom: '1.5rem' }}>
+                                <div className="error-banner" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeftColor: 'var(--color-success)', color: 'var(--color-success)', marginBottom: '1.5rem' }}>
                                     <span>✅</span>
                                     <span>{success}</span>
                                 </div>
@@ -216,7 +216,7 @@ const ReportLeakage = () => {
                     <div className="panel">
                         <div className="panel-header">
                             <h3 className="panel-title">Your Previous Reports</h3>
-                            <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                            <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-accent)' }}>
                                 {reports.length} total
                             </span>
                         </div>
@@ -268,7 +268,7 @@ const ReportLeakage = () => {
                                                         background: 'rgba(59, 130, 246, 0.05)',
                                                         borderRadius: '8px',
                                                         fontSize: '0.85rem',
-                                                        color: 'var(--primary-400)',
+                                                        color: 'var(--color-accent)',
                                                     }}>
                                                         <strong>Admin Response:</strong> {report.admin_notes}
                                                     </div>

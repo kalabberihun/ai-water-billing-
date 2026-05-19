@@ -125,10 +125,10 @@ const Dashboard = () => {
                             border: '1px solid rgba(139, 92, 246, 0.2)'
                         }}>
                             <div className="panel-header" style={{ borderBottomColor: 'rgba(139, 92, 246, 0.1)' }}>
-                                <h3 className="panel-title" style={{ color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <h3 className="panel-title" style={{ color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <span>🪄</span> Smart AI Forecast
                                 </h3>
-                                <span className="badge" style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>
+                                <span className="badge" style={{ background: 'rgba(139, 92, 246, 0.2)', color: 'var(--color-accent)' }}>
                                     AI Confidence: {prediction.confidence}%
                                 </span>
                             </div>
@@ -146,7 +146,7 @@ const Dashboard = () => {
                                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                             Estimated Next Bill
                                         </div>
-                                        <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#2dd4bf', lineHeight: 1 }}>
+                                        <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-accent)', lineHeight: 1 }}>
                                             <span style={{ fontSize: '1rem', color: 'var(--text-tertiary)' }}>ETB</span> {prediction.estimated_cost}
                                         </div>
                                     </div>

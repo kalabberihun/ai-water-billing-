@@ -170,7 +170,7 @@ const NotificationBell = () => {
         if (type === 'CLERK_REVIEW') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', icon: '📋' };
         if (type === 'TASK') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', icon: '🛠️' };
         if (type === 'INFO') return { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', icon: 'ℹ️' };
-        if (type === 'WARNING') return { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', icon: '⚠️' };
+        if (type === 'WARNING') return { bg: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-danger)', icon: '⚠️' };
         return { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', icon: '📈' };
     };
 

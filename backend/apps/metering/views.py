@@ -593,3 +593,177 @@ class AdminLeakageReportView(APIView):
                 pass
         
         return Response(LeakageReportSerializer(report).data)
+
+# ─── Field Reading Tasks Views ──────────────────────────────────────────────
+
+class AdminAssignFieldTaskView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        meter_id = request.data.get('meter_id')
+        clerk_id = request.data.get('clerk_id')
+        
+        if not meter_id or not clerk_id:
+            return Response({'error': 'meter_id and clerk_id are required'}, status=400)
+            
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        try:
+            meter = Meter.objects.get(id=meter_id)
+            clerk = User.objects.get(id=clerk_id, role__name__iexact='CLERK')
+        except Meter.DoesNotExist:
+            return Response({'error': 'Meter not found'}, status=404)
+        except User.DoesNotExist:
+            return Response({'error': 'Clerk not found'}, status=404)
+            
+        from django.utils import timezone
+        # Create a field task (MeterReading)
+        reading = MeterReading.objects.create(
+            meter=meter,
+            status='FIELD_TASK',
+            assigned_to=clerk,
+            assigned_at=timezone.now(),
+            image_url=''  # initially blank
+        )
+        
+        # Send Notification
+        from apps.accounts.models import SystemNotification
+        msg = f"You have been assigned a field check for meter {meter.meter_number}. Please visit the location."
+        SystemNotification.objects.create(user=clerk, alert_type='TASK', message=msg)
+        
+        return Response({'message': 'Field task assigned successfully', 'id': reading.id}, status=201)
+
+class AdminBatchAssignFieldTasksView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        clerks = list(User.objects.filter(role__name__iexact='CLERK'))
+        
+        if not clerks:
+            return Response({'error': 'No clerks available for assignment'}, status=400)
+            
+        active_meters = list(Meter.objects.filter(status='ACTIVE'))
+        
+        if not active_meters:
+            return Response({'error': 'No active meters available'}, status=400)
+            
+        from django.utils import timezone
+        now = timezone.now()
+        
+        tasks_created = 0
+        from apps.accounts.models import SystemNotification
+        
+        for i, meter in enumerate(active_meters):
+            clerk = clerks[i % len(clerks)]
+            
+            # Create a field task
+            MeterReading.objects.create(
+                meter=meter,
+                status='FIELD_TASK',
+                assigned_to=clerk,
+                assigned_at=now,
+                image_url=''  # initially blank
+            )
+            tasks_created += 1
+            
+            # Send Notification
+            msg = f"You have been assigned a field check for meter {meter.meter_number}. Please visit the location."
+            SystemNotification.objects.create(user=clerk, alert_type='TASK', message=msg)
+            
+        return Response({'message': f'Successfully created {tasks_created} field tasks and assigned to {len(clerks)} clerks.'}, status=201)
+
+class ClerkFieldTasksView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['CLERK', 'ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        from django.utils import timezone
+        tasks = MeterReading.objects.filter(
+            status='FIELD_TASK', assigned_to=request.user
+        ).select_related('meter__customer__user').order_by('-assigned_at')
+        
+        data = []
+        for r in tasks:
+            customer_name = "Unassigned"
+            address = "No address provided"
+            if r.meter.customer:
+                if hasattr(r.meter.customer, 'user') and r.meter.customer.user:
+                    customer_name = f"{r.meter.customer.user.first_name} {r.meter.customer.user.last_name}".strip()
+                if r.meter.customer.address:
+                    address = r.meter.customer.address
+                
+            data.append({
+                'id': r.id,
+                'customer': customer_name,
+                'address': address,
+                'meter': r.meter.meter_number,
+                'assigned_at': r.assigned_at.strftime('%Y-%m-%d %H:%M') if r.assigned_at else None,
+                'status': r.status,
+            })
+            
+        return Response(data)
+
+class ClerkSubmitFieldTaskView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['CLERK', 'ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        try:
+            reading = MeterReading.objects.get(id=pk, status='FIELD_TASK', assigned_to=request.user)
+        except MeterReading.DoesNotExist:
+            return Response({'error': 'Field task not found or already completed'}, status=404)
+            
+        image = request.data.get('image')
+        reading_value = request.data.get('reading_value')
+        
+        if not image or not reading_value:
+            return Response({'error': 'Both image and reading_value are required'}, status=400)
+            
+        try:
+            val = float(reading_value)
+            if val < 0:
+                raise ValueError
+        except ValueError:
+            return Response({'error': 'reading_value must be a positive number'}, status=400)
+            
+        # Save image
+        file_path = f"meter_readings/field_tasks/{reading.meter.id}/{uuid.uuid4()}_{image.name}"
+        path = default_storage.save(file_path, image)
+        image_url = settings.MEDIA_URL + path
+        
+        reading.image_url = image_url
+        reading.reading_value = val
+        reading.status = 'VERIFIED'
+        reading.verified_by = request.user
+        reading.save()
+        
+        # Trigger bill generation
+        from apps.billing.tasks import generate_bill
+        try:
+            generate_bill.apply_async(args=[str(reading.id)])
+        except Exception:
+            try:
+                generate_bill.__wrapped__(None, str(reading.id))
+            except Exception as e:
+                print(f"Bill generation failed: {e}")
+                
+        return Response({'message': 'Task completed and reading submitted successfully.'})
+

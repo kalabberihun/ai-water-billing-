@@ -29,13 +29,14 @@ class MeterReading(models.Model):
         ('PROCESSING', 'Processing'),
         ('VERIFIED', 'Verified'),
         ('MANUAL_REVIEW', 'Manual Review'),
+        ('FIELD_TASK', 'Field Task'),
         ('REJECTED', 'Rejected'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     meter = models.ForeignKey(Meter, on_delete=models.CASCADE, related_name='readings')
     reading_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    image_url = models.CharField(max_length=500)
+    image_url = models.CharField(max_length=500, blank=True)
     ocr_confidence = models.FloatField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     submitted_at = models.DateTimeField(auto_now_add=True)

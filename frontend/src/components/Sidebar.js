@@ -31,6 +31,7 @@ const Sidebar = () => {
             { path: '/admin/readings', label: 'Reading Review', icon: '🔍' },
             { path: '/admin/maintenance', label: 'Field Maintenance', icon: '🔧' },
             { path: '/admin/roles', label: 'Role Management', icon: '👥' },
+            { path: '/admin/exports', label: 'Export Data', icon: '📥' },
             { path: '/admin/system', label: 'System Management', icon: '⚙️' },
             { path: '/admin/leakage-reports', label: 'Leakage Reports', icon: '🚰' },
         ];
@@ -81,6 +82,11 @@ const Sidebar = () => {
                         Sign Out
                     </button>
                 </nav>
+                <div className="sidebar-wave">
+                    <svg viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="rgba(0,180,216,0.15)" fillOpacity="1" d="M0,160L48,144C96,128,192,96,288,106.7C384,117,480,171,576,165.3C672,160,768,96,864,80C960,64,1056,96,1152,112C1248,128,1344,128,1392,128L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+                    </svg>
+                </div>
                 <div className="sidebar-footer">
                     <div className="sidebar-user">
                         <div className="sidebar-avatar">{userInitials}</div>

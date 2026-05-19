@@ -107,7 +107,11 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     const [maintSubmitting, setMaintSubmitting] = useState(false);
     const [maintError, setMaintError] = useState('');
 
-
+    // Field Tasks management
+    const [fieldTaskModal, setFieldTaskModal] = useState(false);
+    const [fieldTaskForm, setFieldTaskForm] = useState({ meter_id: '', clerk_id: '' });
+    const [fieldTaskSubmitting, setFieldTaskSubmitting] = useState(false);
+    const [fieldTaskError, setFieldTaskError] = useState('');
 
     const getConfig = () => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
@@ -179,6 +183,38 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         try {
             await axios.post(`${API}/api/metering/admin/batch-assign`, {}, getConfig());
             alert('Batch assigned to clerks successfully!');
+            fetchData();
+        } catch (error) {
+            alert('Batch assign failed: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    // ── Field Task Handler ───────────────────────────────────────────────────
+    const handleFieldTaskSubmit = async () => {
+        if (!fieldTaskForm.meter_id || !fieldTaskForm.clerk_id) {
+            setFieldTaskError('Both meter and clerk must be selected.');
+            return;
+        }
+        setFieldTaskSubmitting(true);
+        try {
+            await axios.post(`${API}/api/metering/admin/field-tasks`, fieldTaskForm, getConfig());
+            alert('Field task assigned successfully!');
+            setFieldTaskModal(false);
+            setFieldTaskForm({ meter_id: '', clerk_id: '' });
+            fetchData();
+        } catch (error) {
+            setFieldTaskError('Assignment failed: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setFieldTaskSubmitting(false);
+        }
+    };
+
+    const handleBatchAssignFieldTasks = async () => {
+        if (!window.confirm('Are you sure you want to assign all active meters to clerks for field tasks? This may create a large number of tasks.')) return;
+        
+        try {
+            const res = await axios.post(`${API}/api/metering/admin/field-tasks/batch`, {}, getConfig());
+            alert(res.data.message || 'Batch field tasks assigned successfully!');
             fetchData();
         } catch (error) {
             alert('Batch assign failed: ' + (error.response?.data?.error || error.message));
@@ -287,7 +323,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         readings: { title: 'Meter Reading Review', subtitle: 'Review, verify, and assign meter readings' },
         maintenance: { title: 'Field Maintenance', subtitle: 'Dispatch and track technician field tasks' },
         roles: { title: 'Role Management', subtitle: 'Assign and manage user roles across the system' },
-
+        exports: { title: 'Export Data', subtitle: 'Download system data as professionally formatted Excel spreadsheets' },
         system: { title: 'System Management', subtitle: 'Direct access to Django admin resources' },
     };
 
@@ -308,7 +344,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                 return renderMaintenance();
             case 'roles':
                 return renderRoles();
-
+            case 'exports':
+                return renderExports();
             case 'system':
                 return renderSystem();
             default:
@@ -343,7 +380,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     <div className="stat-label">Total Collections</div>
                 </div>
                 <div className="stat-card" onClick={() => navigate('/admin/disputes')} style={{ cursor: 'pointer', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }} onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
-                    <div className="stat-icon" style={{ color: '#ef4444' }}>⚖️</div>
+                    <div className="stat-icon" style={{ color: 'var(--color-danger)' }}>⚖️</div>
                     <div className="stat-value" style={{ color: disputes.length > 0 ? '#ef4444' : 'inherit' }}>
                         {disputes.length}
                     </div>
@@ -487,7 +524,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     Dispute Review Queue
                     {disputes.length > 0 && (
                         <span style={{
-                            marginLeft: '0.75rem', background: '#ef4444', color: '#fff',
+                            marginLeft: '0.75rem', background: '#ef4444', color: 'var(--color-text-inverse)',
                             borderRadius: '9999px', padding: '2px 10px',
                             fontSize: '0.8rem', fontWeight: 700
                         }}>{disputes.length}</span>
@@ -564,7 +601,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     Meter Reading Review Queue
                     {pendingReadings.length > 0 && (
                         <span style={{
-                            marginLeft: '0.75rem', background: '#f59e0b', color: '#000',
+                            marginLeft: '0.75rem', background: '#f59e0b', color: 'var(--color-text)',
                             borderRadius: '9999px', padding: '2px 10px',
                             fontSize: '0.8rem', fontWeight: 700
                         }}>{pendingReadings.length}</span>
@@ -573,8 +610,22 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                         className="btn btn-primary btn-sm"
+                        onClick={() => setFieldTaskModal(true)}
+                        style={{ background: 'var(--color-accent)' }}
+                    >
+                        + Assign Field Task
+                    </button>
+                    <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleBatchAssignFieldTasks}
+                        style={{ background: 'var(--color-accent)' }}
+                    >
+                        📍 Assign All Active Meters
+                    </button>
+                    <button
+                        className="btn btn-primary btn-sm"
                         onClick={handleBatchAssign}
-                        style={{ background: 'var(--accent-500)' }}
+                        style={{ background: 'var(--color-accent-hover)' }}
                     >
                         👥 Assign Batch to Clerks
                     </button>
@@ -647,7 +698,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                     Field Maintenance Queue
                     {maintenanceTasks.filter(t => t.status === 'PENDING' || t.status === 'IN_PROGRESS').length > 0 && (
                         <span style={{
-                            marginLeft: '0.75rem', background: '#3b82f6', color: '#fff',
+                            marginLeft: '0.75rem', background: '#3b82f6', color: 'var(--color-text-inverse)',
                             borderRadius: '9999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700
                         }}>{maintenanceTasks.filter(t => t.status !== 'RESOLVED').length}</span>
                     )}
@@ -691,7 +742,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                         <button 
                                             className="btn btn-danger btn-sm" 
                                             onClick={() => handleMaintDelete(task.id)}
-                                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444' }}
+                                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: 'transparent', border: '1px solid #ef4444', color: 'var(--color-danger)' }}
                                         >
                                             Delete
                                         </button>
@@ -738,7 +789,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                             .filter(u => u.full_name.toLowerCase().includes(roleSearch.toLowerCase()) || u.email.toLowerCase().includes(roleSearch.toLowerCase()))
                             .map(user => (
                                 <tr key={user.id}>
-                                    <td style={{ fontWeight: 600 }}>{user.full_name} {user.is_staff ? <span style={{ color: '#3b82f6', fontSize: '0.8rem', marginLeft: 4 }}>[Staff]</span> : ''}</td>
+                                    <td style={{ fontWeight: 600 }}>{user.full_name} {user.is_staff ? <span style={{ color: 'var(--color-accent)', fontSize: '0.8rem', marginLeft: 4 }}>[Staff]</span> : ''}</td>
                                     <td style={{ color: 'var(--text-secondary)' }}>{user.email}</td>
                                     <td>
                                         <span className={`badge ${user.role === 'ADMIN' ? 'badge-info' : user.role === 'CLERK' ? 'badge-warning' : 'badge-secondary'}`} style={{ opacity: user.role ? 1 : 0.5 }}>
@@ -772,6 +823,77 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         </div>
     );
 
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SECTION: Exports
+    // ═══════════════════════════════════════════════════════════════════════════
+    const renderExports = () => (
+        <div className="panel">
+            <div className="panel-header">
+                <h2 className="panel-title">📥 Export Data</h2>
+            </div>
+            <div className="panel-body">
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+                    Download system data as professionally formatted Excel spreadsheets.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.25rem' }}>
+                    <div style={{
+                        background: 'var(--bg-body)', border: '1px solid var(--border-default)',
+                        borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease', cursor: 'pointer'
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                        onClick={() => {
+                            const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                            window.open(`${API}/api/analytics/export/bills/?token=${tokenObj?.access}`, '_blank');
+                        }}
+                    >
+                        <div className="stat-icon rose" style={{ width: 48, height: 48, fontSize: '1.4rem', marginBottom: 0 }}>💰</div>
+                        <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>Export Bills</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Download all billing records with amounts, status, and due dates.</div>
+                        <button className="btn btn-primary btn-sm" style={{ marginTop: '0.25rem' }}>⬇ Download .xlsx</button>
+                    </div>
+
+                    <div style={{
+                        background: 'var(--bg-body)', border: '1px solid var(--border-default)',
+                        borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease', cursor: 'pointer'
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                        onClick={() => {
+                            const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                            window.open(`${API}/api/analytics/export/customers/?token=${tokenObj?.access}`, '_blank');
+                        }}
+                    >
+                        <div className="stat-icon blue" style={{ width: 48, height: 48, fontSize: '1.4rem', marginBottom: 0 }}>👥</div>
+                        <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>Export Customers</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Download the full customer list with contact info and meter counts.</div>
+                        <button className="btn btn-primary btn-sm" style={{ marginTop: '0.25rem' }}>⬇ Download .xlsx</button>
+                    </div>
+
+                    <div style={{
+                        background: 'var(--bg-body)', border: '1px solid var(--border-default)',
+                        borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease', cursor: 'pointer'
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                        onClick={() => {
+                            const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                            window.open(`${API}/api/analytics/export/anomalies/?token=${tokenObj?.access}`, '_blank');
+                        }}
+                    >
+                        <div className="stat-icon amber" style={{ width: 48, height: 48, fontSize: '1.4rem', marginBottom: 0 }}>⚠️</div>
+                        <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>Export Anomalies</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Download anomaly and alert reports with resolution status.</div>
+                        <button className="btn btn-primary btn-sm" style={{ marginTop: '0.25rem' }}>⬇ Download .xlsx</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -903,16 +1025,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
 
             {/* ── Reading Review Modal ───────────────────────────────────── */}
             {reviewModal && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-                    zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
-                        width: '100%', maxWidth: '480px', boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-default)',
-                        maxHeight: '90vh', overflowY: 'auto'
-                    }}>
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '480px' }}>
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Review Reading</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
                             Customer: <strong>{reviewModal.customer}</strong> &nbsp;|&nbsp; Meter: <code>{reviewModal.meter}</code>
@@ -923,7 +1037,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 <SecureImage
                                     src={reviewModal.image_url.startsWith('http') ? reviewModal.image_url : `${API}${reviewModal.image_url}`}
                                     alt="Meter reading"
-                                    style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', background: '#000' }}
+                                    style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', background: 'var(--color-primary)' }}
                                 />
                             </div>
                         )}
@@ -933,7 +1047,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 {reviewModal.reading_value ?? 'N/A'} m³
                             </strong>
                             {reviewModal.ocr_confidence && (
-                                <span style={{ marginLeft: '0.75rem', color: '#f59e0b' }}>
+                                <span style={{ marginLeft: '0.75rem', color: 'var(--color-warning)' }}>
                                     ({Math.round(reviewModal.ocr_confidence * 100)}% confidence)
                                 </span>
                             )}
@@ -953,7 +1067,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                             }}
                         />
                         {reviewError && (
-                            <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{reviewError}</p>
+                            <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{reviewError}</p>
                         )}
 
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -972,16 +1086,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
 
             {/* ── Dispute Resolve Modal ──────────────────────────────────── */}
             {disputeModal && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-                    zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
-                        width: '100%', maxWidth: '520px', boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-default)',
-                        maxHeight: '90vh', overflowY: 'auto'
-                    }}>
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '520px' }}>
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Review Dispute</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
                             Customer: <strong>{disputeModal.customer}</strong> &nbsp;|&nbsp;
@@ -1038,7 +1144,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                             }}
                         />
                         {disputeError && (
-                            <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{disputeError}</p>
+                            <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{disputeError}</p>
                         )}
 
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -1061,16 +1167,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
 
             {/* ── Maintenance Dispatch Modal ─────────────────────────────── */}
             {maintModal && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-                    zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
-                        width: '100%', maxWidth: '520px', boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-default)',
-                        maxHeight: '90vh', overflowY: 'auto'
-                    }}>
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '520px' }}>
                         <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Dispatch Technician</h2>
 
                         <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Select Meter</label>
@@ -1108,13 +1206,52 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                         />
 
                         {maintError && (
-                            <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{maintError}</p>
+                            <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{maintError}</p>
                         )}
 
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button className="btn btn-secondary btn-sm" onClick={() => setMaintModal(false)} disabled={maintSubmitting}>Cancel</button>
                             <button className="btn btn-primary btn-sm" onClick={handleMaintSubmit} disabled={maintSubmitting}>
                                 {maintSubmitting ? 'Dispatching...' : 'Dispatch Task'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Field Task Modal ─────────────────────────────── */}
+            {fieldTaskModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '520px' }}>
+                        <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Assign Field Task</h2>
+
+                        <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Select Meter</label>
+                        <SearchableSelect
+                            placeholder="-- Type or Select Meter --"
+                            value={fieldTaskForm.meter_id}
+                            onChange={val => { setFieldTaskForm({ ...fieldTaskForm, meter_id: val }); setFieldTaskError(''); }}
+                            options={(Array.isArray(allMeters) ? allMeters : [])
+                                .map(m => ({ value: m.id, label: m.meter_number }))}
+                        />
+
+                        <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Assign Clerk</label>
+                        <SearchableSelect
+                            placeholder="-- Type or Select Clerk --"
+                            value={fieldTaskForm.clerk_id}
+                            onChange={val => { setFieldTaskForm({ ...fieldTaskForm, clerk_id: val }); setFieldTaskError(''); }}
+                            options={allUsers
+                                .filter(u => u.role?.toUpperCase() === 'CLERK')
+                                .map(c => ({ value: c.id, label: `${c.full_name} (${c.email})` }))}
+                        />
+
+                        {fieldTaskError && (
+                            <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{fieldTaskError}</p>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setFieldTaskModal(false)} disabled={fieldTaskSubmitting}>Cancel</button>
+                            <button className="btn btn-primary btn-sm" onClick={handleFieldTaskSubmit} disabled={fieldTaskSubmitting}>
+                                {fieldTaskSubmitting ? 'Assigning...' : 'Assign Field Task'}
                             </button>
                         </div>
                     </div>
