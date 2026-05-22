@@ -38,7 +38,7 @@ Render will host the Django server. Because it's on the free tier, we will run C
    - **Name:** `water-billing-api`
    - **Environment:** `Python 3` (or Docker if preferred, but Python 3 is faster to build)
    - **Root Directory:** `backend`
-   - **Build Command:** `pip install -r requirements.txt`
+   - **Build Command:** `pip install --no-cache-dir -r requirements.txt && python manage.py migrate && python create_superuser.py`
    - **Start Command:** `gunicorn config.wsgi:application`
    - **Instance Type:** `Free`
 5. Click **Advanced** and add the following **Environment Variables**:
@@ -54,6 +54,7 @@ Render will host the Django server. Because it's on the free tier, we will run C
    - `CELERY_TASK_ALWAYS_EAGER`: `True`
    - `FIELD_ENCRYPTION_KEY`: *(Generate a secure 32-byte urlsafe base64 key)*
    - `GEMINI_API_KEY`: *(Your Google Gemini API Key)*
+   - `TMPDIR`: `/var/tmp` *(Crucial to prevent out-of-memory errors during build)*
 6. Click **Create Web Service**. 
 7. Once successfully built, copy the public URL Render gives you (e.g., `https://water-billing-api.onrender.com`).
 
