@@ -30,7 +30,7 @@ const Register = () => {
         setError('');
         setLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/api/auth/register`, formData);
+            await axios.post(`${API_URL}/api/auth/register`, formData);
             // Redirect to email verification page
             navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
         } catch (err) {

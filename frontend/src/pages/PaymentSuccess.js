@@ -11,7 +11,7 @@ const PaymentSuccess = () => {
     const [retryCount, setRetryCount] = useState(0);
 
     const txRef = searchParams.get('tx_ref');
-    const billId = searchParams.get('bill_id');
+    const _billId = searchParams.get('bill_id'); // eslint-disable-line no-unused-vars
 
     useEffect(() => {
         if (!txRef) {

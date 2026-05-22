@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -15,8 +14,7 @@ const VerifyEmail = () => {
     const [resendCooldown, setResendCooldown] = useState(0);
     const [resendMsg, setResendMsg] = useState('');
     const inputRefs = useRef([]);
-    const navigate = useNavigate();
-    const dispatch = useDispatch();
+
 
     // Mask the email for display: jo***@gmail.com
     const maskedEmail = emailParam

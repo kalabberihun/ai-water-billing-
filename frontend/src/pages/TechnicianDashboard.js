@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
@@ -22,7 +22,7 @@ const TechnicianDashboard = () => {
         return { headers: { Authorization: `Bearer ${tokenObj?.access}` } };
     };
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await axios.get(`${API}/api/metering/technician/maintenance`, getConfig());
@@ -32,9 +32,9 @@ const TechnicianDashboard = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const openResolve = (task) => {
         setResolveModal(task);

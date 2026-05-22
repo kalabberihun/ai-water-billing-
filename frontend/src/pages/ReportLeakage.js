@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const ReportLeakage = () => {
-    const user = useSelector((state) => state.auth.user);
+
     const [meters, setMeters] = useState([]);
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(false);
