@@ -11,7 +11,8 @@ echo "==> Installing image processing packages..."
 pip install --no-cache-dir opencv-python-headless==4.9.0.80 pytesseract==0.3.10 pillow==10.2.0
 
 echo "==> Installing storage & API packages..."
-pip install --no-cache-dir boto3==1.34.0 django-storages==1.14.2 drf-yasg==1.21.7 openpyxl==3.1.5
+pip install --no-cache-dir boto3==1.34.0 django-storages==1.14.2 drf-yasg==1.21.7 openpyxl==3.1.5 reportlab==4.4.10
+
 
 echo "==> Installing AI packages..."
 pip install --no-cache-dir "google-genai>=1.51.0"
