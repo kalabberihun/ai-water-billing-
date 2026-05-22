@@ -38,8 +38,8 @@ Render will host the Django server. Because it's on the free tier, we will run C
    - **Name:** `water-billing-api`
    - **Environment:** `Python 3` (or Docker if preferred, but Python 3 is faster to build)
    - **Root Directory:** `backend`
-   - **Build Command:** `pip install --no-cache-dir -r requirements.txt && python manage.py migrate && python create_superuser.py`
-   - **Start Command:** `gunicorn config.wsgi:application`
+   - **Build Command:** `bash build_render.sh`
+   - **Start Command:** `python manage.py migrate && python create_superuser.py && gunicorn config.wsgi:application`
    - **Instance Type:** `Free`
 5. Click **Advanced** and add the following **Environment Variables**:
    - `DEBUG`: `False`
@@ -58,16 +58,20 @@ Render will host the Django server. Because it's on the free tier, we will run C
 6. Click **Create Web Service**. 
 7. Once successfully built, copy the public URL Render gives you (e.g., `https://water-billing-api.onrender.com`).
 
-### 📦 Run Django Database Migrations
+### 📦 Django Database Migrations & Superuser
+These steps are now handled **automatically** on every startup because of the custom **Start Command** configured above. 
+
+However, if you ever need to run them manually as a fallback:
 1. In your Render Web Service dashboard, go to the **Shell** tab (or **Manual Deploy** -> **Run a one-off job**).
-2. Run this command to initialize your database tables:
+2. Run migrations manually:
    ```bash
    python manage.py migrate
    ```
-3. Create an admin user:
+3. Create a superuser manually:
    ```bash
    python manage.py createsuperuser
    ```
+
 
 ---
 
