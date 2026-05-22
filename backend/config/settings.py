@@ -115,6 +115,12 @@ DATABASES = {
     }
 }
 
+if db_host not in ('localhost', '127.0.0.1'):
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+    }
+
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
