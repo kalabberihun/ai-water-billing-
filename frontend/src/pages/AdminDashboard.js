@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend, AreaChart, Area
 } from 'recharts';
 import Sidebar from '../components/Sidebar';
@@ -139,12 +139,12 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     const [systemActive, setSystemActive] = useState(true);
     const [systemControlLoading, setSystemControlLoading] = useState(false);
 
-    const getConfig = () => {
+    const getConfig = useCallback(() => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
         return { headers: { Authorization: `Bearer ${tokenObj?.access}` } };
-    };
+    }, []);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             const [statsRes, readingsRes, disputesRes, usersRes, tasksRes, metersRes, paymentsRes, systemRes] = await Promise.all([
                 axios.get(`${API}/api/auth/admin/stats`, getConfig()),
@@ -171,9 +171,11 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [getConfig]);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     // ── Reading review handlers ───────────────────────────────────────────────
     const openReview = (reading) => {

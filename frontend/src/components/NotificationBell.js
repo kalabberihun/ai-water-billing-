@@ -125,7 +125,7 @@ const NotificationBell = () => {
             clearInterval(intervalId);
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isClerk]);
+    }, [isClerk, user?.is_staff, user?.role]);
 
     const toggleDropdown = () => {
         setIsOpen(!isOpen);

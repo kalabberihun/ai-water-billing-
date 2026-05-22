@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
@@ -25,12 +25,12 @@ const ClerkDashboard = () => {
     const [fieldTaskError, setFieldTaskError] = useState('');
     const [fieldTaskSubmitting, setFieldTaskSubmitting] = useState(false);
 
-    const getConfig = () => {
+    const getConfig = useCallback(() => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
         return { headers: { Authorization: `Bearer ${tokenObj?.access}` } };
-    };
+    }, []);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const [pendingRes, fieldRes] = await Promise.all([
@@ -44,9 +44,11 @@ const ClerkDashboard = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [getConfig]);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const openReview = (reading) => {
         setReviewModal(reading);
