@@ -17,4 +17,8 @@ pip install --no-cache-dir boto3==1.34.0 django-storages==1.14.2 drf-yasg==1.21.
 echo "==> Installing AI packages..."
 pip install --no-cache-dir "google-genai>=1.51.0"
 
+echo "==> Installing ML prediction packages..."
+pip install --no-cache-dir joblib==1.5.3 scikit-learn==1.8.0 pandas==3.0.2
+
+
 echo "==> All packages installed successfully!"

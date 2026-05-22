@@ -22,3 +22,7 @@ google-genai>=1.51.0
 openpyxl==3.1.5
 PyJWT==2.11.0
 reportlab==4.4.10
+joblib==1.5.3
+scikit-learn==1.8.0
+pandas==3.0.2
+
