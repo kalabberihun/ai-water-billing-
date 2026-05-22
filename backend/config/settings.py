@@ -9,7 +9,24 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Clean and sanitize ALLOWED_HOSTS to prevent common URL copy-paste errors
+raw_hosts = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = []
+for host in raw_hosts:
+    host = host.strip()
+    if not host:
+        continue
+    # Remove protocol prefix if user pasted 'http://' or 'https://'
+    if '://' in host:
+        host = host.split('://')[1]
+    # Remove any trailing path/slashes
+    if '/' in host:
+        host = host.split('/')[0]
+    # Remove port number if pasted (like ':3000' or ':8000')
+    if ':' in host:
+        host = host.split(':')[0]
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -167,12 +184,16 @@ REST_FRAMEWORK = {
 }
 
 # CORS
-CORS_ALLOWED_ORIGINS = [
-    f"https://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
-] + [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+raw_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if raw_cors:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in raw_cors.split(',') if origin.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        f"https://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
+    ] + [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 
 # JWT Configuration (RS256)
