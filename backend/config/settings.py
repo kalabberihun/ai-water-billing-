@@ -59,26 +59,40 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-import urllib.parse
-
 db_host_env = os.environ.get('DB_HOST', 'localhost')
 db_url_env = os.environ.get('DATABASE_URL', '')
 db_uri = db_url_env if (db_url_env.startswith('postgresql://') or db_url_env.startswith('postgres://')) else db_host_env
 
 if db_uri.startswith('postgresql://') or db_uri.startswith('postgres://'):
-    urllib.parse.uses_netloc.append("postgres")
-    urllib.parse.uses_netloc.append("postgresql")
-    url = urllib.parse.urlparse(db_uri)
-    
-    db_user = url.username or 'postgres'
-    db_password = url.password or 'postgres'
-    # Strip accidental brackets if the user kept the [YOUR-PASSWORD] placeholders literally
-    if db_password.startswith('[') and db_password.endswith(']'):
-        db_password = db_password[1:-1]
+    # Custom split-based parser to avoid ValueError: ... does not appear to be an IPv4 or IPv6 address
+    # caused by bracketed passwords containing '@' in urllib.parse.
+    try:
+        s = db_uri.split('://', 1)[1]
+        path_parts = s.split('/', 1)
+        auth_host = path_parts[0]
+        db_name = path_parts[1] if len(path_parts) > 1 else 'postgres'
         
-    db_host = url.hostname or 'localhost'
-    db_port = str(url.port or '5432')
-    db_name = url.path[1:] if url.path else 'postgres'
+        auth_parts = auth_host.rsplit('@', 1)
+        credentials = auth_parts[0]
+        host_port = auth_parts[1] if len(auth_parts) > 1 else auth_parts[0]
+        
+        cred_parts = credentials.split(':', 1)
+        db_user = cred_parts[0]
+        db_password = cred_parts[1] if len(cred_parts) > 1 else ''
+        
+        if db_password.startswith('[') and db_password.endswith(']'):
+            db_password = db_password[1:-1]
+            
+        hp_parts = host_port.split(':', 1)
+        db_host = hp_parts[0]
+        db_port = hp_parts[1] if len(hp_parts) > 1 else '5432'
+    except Exception:
+        # Fallback to defaults on any parsing error
+        db_user = 'postgres'
+        db_password = 'postgres'
+        db_host = 'localhost'
+        db_port = '5432'
+        db_name = 'ai_water_billing'
 else:
     db_user = os.environ.get('DB_USER', 'postgres')
     db_password = os.environ.get('DB_PASSWORD', 'postgres')
