@@ -24,6 +24,13 @@ def generate_bill(self, reading_id):
             if hasattr(reading, 'bill'):
                 return {'status': 'already_exists', 'bill_id': str(reading.bill.id)}
             
+            # Check if meter has an assigned customer
+            if not reading.meter.customer:
+                return {
+                    'status': 'ignored_no_customer',
+                    'message': f"Meter {reading.meter.meter_number} has no assigned customer. Skipping bill generation."
+                }
+            
             # Get previous reading
             previous_reading = MeterReading.objects.filter(
                 meter=reading.meter,
@@ -47,14 +54,18 @@ def generate_bill(self, reading_id):
             remaining = consumption
             
             customer_class = reading.meter.customer.customer_class or 'RESIDENT'
-            tiers = TariffTier.objects.filter(customer_class=customer_class)
-            if not tiers.exists():
-                tiers = TariffTier.objects.filter(customer_class='RESIDENT')
+            tiers = list(TariffTier.objects.filter(customer_class=customer_class))
+            if not tiers:
+                tiers = list(TariffTier.objects.filter(customer_class='RESIDENT'))
             
-            for tier in tiers:
+            for i, tier in enumerate(tiers):
                 if remaining <= 0:
                     break
-                tier_usage = min(remaining, tier.max_usage - tier.min_usage)
+                if i == len(tiers) - 1:
+                    # Last tier is catch-all, consume all remaining consumption
+                    tier_usage = remaining
+                else:
+                    tier_usage = min(remaining, tier.max_usage - tier.min_usage)
                 subtotal += tier_usage * tier.price_per_unit
                 remaining -= tier_usage
             

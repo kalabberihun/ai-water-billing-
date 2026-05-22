@@ -26,6 +26,7 @@ const Sidebar = () => {
     } else if (user?.role === 'Admin' || user?.is_staff || user?.role === 'ADMIN') {
         navItems = [
             { path: '/admin', label: 'Dashboard', icon: '📊' },
+            { path: '/admin/payments', label: 'Customer Payments', icon: '💳' },
             { path: '/admin/revenue', label: 'Revenue', icon: '💰' },
             { path: '/admin/disputes', label: 'Dispute Review', icon: '⚖️' },
             { path: '/admin/readings', label: 'Reading Review', icon: '🔍' },

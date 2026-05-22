@@ -113,6 +113,24 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     const [fieldTaskSubmitting, setFieldTaskSubmitting] = useState(false);
     const [fieldTaskError, setFieldTaskError] = useState('');
 
+    // Customer Payments management
+    const [customerPayments, setCustomerPayments] = useState([]);
+    const [paymentKpis, setPaymentKpis] = useState({
+        total_customers: 0,
+        paid_this_month: 0,
+        unpaid: 0,
+        overdue: 0,
+        total_revenue: '0.00'
+    });
+    const [selectedCustomers, setSelectedCustomers] = useState([]);
+    const [paymentSearch, setPaymentSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [zoneFilter, setZoneFilter] = useState('');
+    const [monthFilter, setMonthFilter] = useState('');
+    const [deactivateModalCustomer, setDeactivateModalCustomer] = useState(null);
+    const [reactivateModalCustomer, setReactivateModalCustomer] = useState(null);
+    const [detailsModalCustomer, setDetailsModalCustomer] = useState(null);
+
     const getConfig = () => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
         return { headers: { Authorization: `Bearer ${tokenObj?.access}` } };
@@ -120,13 +138,14 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
 
     const fetchData = async () => {
         try {
-            const [statsRes, readingsRes, disputesRes, usersRes, tasksRes, metersRes] = await Promise.all([
+            const [statsRes, readingsRes, disputesRes, usersRes, tasksRes, metersRes, paymentsRes] = await Promise.all([
                 axios.get(`${API}/api/auth/admin/stats`, getConfig()),
                 axios.get(`${API}/api/auth/admin/pending-readings`, getConfig()),
                 axios.get(`${API}/api/auth/admin/disputes`, getConfig()),
                 axios.get(`${API}/api/auth/admin/users`, getConfig()),
                 axios.get(`${API}/api/metering/admin/maintenance`, getConfig()),
                 axios.get(`${API}/api/metering/meters`, getConfig()),
+                axios.get(`${API}/api/billing/admin/customer-payments`, getConfig())
             ]);
             setStats(statsRes.data);
             setPendingReadings(readingsRes.data);
@@ -135,6 +154,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
             setAllRoles(usersRes.data.roles || []);
             setMaintenanceTasks(tasksRes.data);
             setAllMeters(metersRes.data.results || metersRes.data);
+            setCustomerPayments(paymentsRes.data.customers || []);
+            setPaymentKpis(paymentsRes.data.kpis || {});
         } catch (error) {
             console.error('Error fetching admin data:', error);
         } finally {
@@ -315,6 +336,449 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         return map[status] || 'badge-warning';
     };
 
+    // ── Customer Payments Action Handlers ─────────────────────────────────────
+    const handleSendWarning = async (customerId) => {
+        try {
+            const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
+                action: 'warn',
+                customer_id: customerId
+            }, getConfig());
+            if (res.data.success) {
+                alert('Warning notification and email sent successfully!');
+                fetchData();
+            } else {
+                alert('Action failed: ' + (res.data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error sending warning: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const handleDeactivateMeter = async (customerId) => {
+        try {
+            const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
+                action: 'deactivate_meter',
+                customer_id: customerId
+            }, getConfig());
+            if (res.data.success) {
+                alert('Meter remotely deactivated successfully!');
+                setDeactivateModalCustomer(null);
+                fetchData();
+            } else {
+                alert('Action failed: ' + (res.data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error deactivating meter: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const handleReactivateMeter = async (customerId) => {
+        try {
+            const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
+                action: 'reactivate_meter',
+                customer_id: customerId
+            }, getConfig());
+            if (res.data.success) {
+                alert('Meter remotely reactivated successfully!');
+                setReactivateModalCustomer(null);
+                fetchData();
+            } else {
+                alert('Action failed: ' + (res.data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error reactivating meter: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const handleBulkWarn = async () => {
+        if (selectedCustomers.length === 0) return;
+        if (!window.confirm(`Are you sure you want to send warning notifications and emails to the ${selectedCustomers.length} selected customers?`)) return;
+        try {
+            const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
+                action: 'bulk_warn',
+                customer_ids: selectedCustomers
+            }, getConfig());
+            if (res.data.success) {
+                alert(res.data.message || 'Bulk warnings sent successfully!');
+                setSelectedCustomers([]);
+                fetchData();
+            } else {
+                alert('Action failed: ' + (res.data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error in bulk warning: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const handleBulkFlag = async () => {
+        if (selectedCustomers.length === 0) return;
+        if (!window.confirm(`Are you sure you want to flag the ${selectedCustomers.length} selected customer accounts for administrative review?`)) return;
+        try {
+            const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
+                action: 'bulk_flag',
+                customer_ids: selectedCustomers
+            }, getConfig());
+            if (res.data.success) {
+                alert(res.data.message || 'Bulk accounts flagged successfully!');
+                setSelectedCustomers([]);
+                fetchData();
+            } else {
+                alert('Action failed: ' + (res.data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error in bulk flag: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const getPaymentBadge = (status) => {
+        const map = {
+            'PAID': 'badge-success',
+            'UNPAID': 'badge-warning',
+            'OVERDUE': 'badge-danger',
+            'PARTIAL': 'badge-info',
+            'NONE': 'badge-secondary'
+        };
+        return map[status] || 'badge-secondary';
+    };
+
+    const getMeterBadge = (status) => {
+        const map = {
+            'ACTIVE': 'badge-success',
+            'DISCONNECTED': 'badge-danger',
+            'MAINTENANCE': 'badge-warning',
+            'NONE': 'badge-secondary'
+        };
+        return map[status] || 'badge-secondary';
+    };
+
+    const CALENDAR_MONTHS = [
+        { value: '01', label: 'January' },
+        { value: '02', label: 'February' },
+        { value: '03', label: 'March' },
+        { value: '04', label: 'April' },
+        { value: '05', label: 'May' },
+        { value: '06', label: 'June' },
+        { value: '07', label: 'July' },
+        { value: '08', label: 'August' },
+        { value: '09', label: 'September' },
+        { value: '10', label: 'October' },
+        { value: '11', label: 'November' },
+        { value: '12', label: 'December' }
+    ];
+
+    const renderPayments = () => {
+        // Unique zones for dropdown options
+        const uniqueZones = [...new Set(customerPayments.map(c => c.zone).filter(Boolean))];
+
+        // Filter customer payments list
+        const filteredPayments = customerPayments.filter(c => {
+            const matchesSearch = !paymentSearch || 
+                c.name.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                c.email.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                c.id.toLowerCase().includes(paymentSearch.toLowerCase());
+                
+            const matchesStatus = !statusFilter || c.payment_status === statusFilter;
+            
+            const matchesZone = !zoneFilter || c.zone === zoneFilter;
+            
+            const matchesMonth = !monthFilter || (c.latest_bill_date && c.latest_bill_date.split('-')[1] === monthFilter);
+            
+            return matchesSearch && matchesStatus && matchesZone && matchesMonth;
+        });
+
+        const toggleSelectCustomer = (id) => {
+            if (selectedCustomers.includes(id)) {
+                setSelectedCustomers(prev => prev.filter(cId => cId !== id));
+            } else {
+                setSelectedCustomers(prev => [...prev, id]);
+            }
+        };
+
+        const toggleSelectAll = () => {
+            if (selectedCustomers.length === filteredPayments.length) {
+                setSelectedCustomers([]);
+            } else {
+                setSelectedCustomers(filteredPayments.map(c => c.id));
+            }
+        };
+
+        return (
+            <>
+                {/* KPI Cards */}
+                <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+                    <div className="stat-card">
+                        <div className="stat-icon blue">👥</div>
+                        <div className="stat-value">{paymentKpis.total_customers ?? 0}</div>
+                        <div className="stat-label">Total Customers</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-icon teal">✓</div>
+                        <div className="stat-value">{paymentKpis.paid_this_month ?? 0}</div>
+                        <div className="stat-label">Paid This Month</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-icon amber">⏳</div>
+                        <div className="stat-value">{paymentKpis.unpaid ?? 0}</div>
+                        <div className="stat-label">Unpaid Accounts</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-icon rose">⚠</div>
+                        <div className="stat-value" style={{ color: paymentKpis.overdue > 0 ? 'var(--color-danger)' : 'inherit' }}>
+                            {paymentKpis.overdue ?? 0}
+                        </div>
+                        <div className="stat-label">Overdue Bills</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-icon success">💰</div>
+                        <div className="stat-value">ETB {paymentKpis.total_revenue ?? '0.00'}</div>
+                        <div className="stat-label">Total Revenue Collected</div>
+                    </div>
+                </div>
+
+                {/* Filters & Search */}
+                <div className="panel" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{
+                        display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '1rem',
+                        alignItems: 'center', justifyContent: 'space-between'
+                    }}>
+                        <div style={{ flex: '1 1 250px', minWidth: '200px' }}>
+                            <input
+                                type="text"
+                                placeholder="Search by customer name, email, or ID..."
+                                value={paymentSearch}
+                                onChange={e => setPaymentSearch(e.target.value)}
+                                style={{
+                                    width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px',
+                                    border: '1px solid var(--border-default)', background: 'var(--bg-body)',
+                                    color: 'var(--text-primary)', fontSize: '0.9rem'
+                                }}
+                            />
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', flex: '2 1 auto' }}>
+                            <select
+                                value={statusFilter}
+                                onChange={e => setStatusFilter(e.target.value)}
+                                style={{
+                                    padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-default)',
+                                    background: 'var(--bg-body)', color: 'var(--text-primary)', fontSize: '0.9rem'
+                                }}
+                            >
+                                <option value="">-- All Payment Statuses --</option>
+                                <option value="PAID">Paid</option>
+                                <option value="UNPAID">Unpaid</option>
+                                <option value="OVERDUE">Overdue</option>
+                                <option value="PARTIAL">Partial</option>
+                                <option value="NONE">No Bills</option>
+                            </select>
+
+                            <select
+                                value={zoneFilter}
+                                onChange={e => setZoneFilter(e.target.value)}
+                                style={{
+                                    padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-default)',
+                                    background: 'var(--bg-body)', color: 'var(--text-primary)', fontSize: '0.9rem'
+                                }}
+                            >
+                                <option value="">-- All Zones/Areas --</option>
+                                {uniqueZones.map(zone => (
+                                    <option key={zone} value={zone}>{zone}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={monthFilter}
+                                onChange={e => setMonthFilter(e.target.value)}
+                                style={{
+                                    padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-default)',
+                                    background: 'var(--bg-body)', color: 'var(--text-primary)', fontSize: '0.9rem'
+                                }}
+                            >
+                                <option value="">-- All Months --</option>
+                                {CALENDAR_MONTHS.map(m => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
+
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => {
+                                    setPaymentSearch('');
+                                    setStatusFilter('');
+                                    setZoneFilter('');
+                                    setMonthFilter('');
+                                }}
+                                style={{ padding: '0.5rem 1rem' }}
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bulk Actions Toolbar */}
+                {selectedCustomers.length > 0 && (
+                    <div style={{
+                        background: 'rgba(52, 120, 255, 0.1)', border: '1.5px solid var(--primary-400)',
+                        borderRadius: '12px', padding: '1rem 1.5rem', marginBottom: '1.5rem',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        animation: 'fadeIn 200ms ease'
+                    }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            <span>💳 {selectedCustomers.length} Customer{selectedCustomers.length > 1 ? 's' : ''} Selected</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleBulkWarn}
+                                style={{ background: 'var(--color-warning)', border: 'none', color: '#fff', fontWeight: 600 }}
+                            >
+                                ✉ Bulk Send Warning
+                            </button>
+                            <button
+                                className="btn btn-danger btn-sm"
+                                onClick={handleBulkFlag}
+                                style={{ fontWeight: 600 }}
+                            >
+                                🚩 Bulk Flag Account
+                            </button>
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setSelectedCustomers([])}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Customer Payments Table */}
+                <div className="panel">
+                    <div className="panel-header">
+                        <h2 className="panel-title">Customer Billing Status Overview</h2>
+                        <button className="btn btn-secondary btn-sm" onClick={fetchData}>↻ Refresh</button>
+                    </div>
+                    <div className="panel-body" style={{ padding: 0 }}>
+                        {filteredPayments.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔎</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>No customers matching current filters</div>
+                                <div style={{ margin: '0.5rem 0 0', opacity: 0.7 }}>Try adjusting your search query or filters.</div>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: '40px', textAlign: 'center' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={filteredPayments.length > 0 && selectedCustomers.length === filteredPayments.length}
+                                                onChange={toggleSelectAll}
+                                                style={{ cursor: 'pointer', scale: '1.1' }}
+                                            />
+                                        </th>
+                                        <th>Customer Details</th>
+                                        <th>Zone</th>
+                                        <th>Current Bill</th>
+                                        <th>Payment Status</th>
+                                        <th>Meter Status</th>
+                                        <th>Months Unpaid</th>
+                                        <th>Last Payment</th>
+                                        <th style={{ textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredPayments.map(c => {
+                                        const isSelected = selectedCustomers.includes(c.id);
+                                        return (
+                                            <tr key={c.id} style={{ background: isSelected ? 'rgba(52, 120, 255, 0.04)' : 'transparent' }}>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleSelectCustomer(c.id)}
+                                                        style={{ cursor: 'pointer', scale: '1.1' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: 600 }}>{c.name}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <span>ID: <code>{c.id.split('-')[0]}...</code></span>
+                                                        <span>{c.email}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span style={{ fontWeight: 500 }}>{c.zone || 'N/A'}</span></td>
+                                                <td style={{ fontWeight: 600 }}>
+                                                    {c.current_bill_amount > 0 ? `ETB ${c.current_bill_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                                                </td>
+                                                <td>
+                                                    <span className={`badge ${getPaymentBadge(c.payment_status)}`} style={{ textTransform: 'uppercase', fontWeight: 600, padding: '4px 8px', borderRadius: '6px' }}>
+                                                        {c.payment_status}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span className={`badge ${getMeterBadge(c.meter?.status)}`} style={{ textTransform: 'uppercase', fontWeight: 600, padding: '4px 8px', borderRadius: '6px' }}>
+                                                        {c.meter?.status ?? 'NONE'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ textAlign: 'center', fontWeight: c.consecutive_unpaid_months > 0 ? 700 : 400, color: c.consecutive_unpaid_months >= 2 ? 'var(--color-danger)' : 'inherit' }}>
+                                                    {c.consecutive_unpaid_months > 0 ? c.consecutive_unpaid_months : '—'}
+                                                </td>
+                                                <td>{c.last_payment_date}</td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                                        <button
+                                                            className="btn btn-secondary btn-sm"
+                                                            onClick={() => setDetailsModalCustomer(c)}
+                                                            style={{ padding: '2px 8px', fontSize: '0.8rem', minHeight: 'auto' }}
+                                                            title="View Billing History"
+                                                        >
+                                                            Profile
+                                                        </button>
+                                                        {c.payment_status !== 'PAID' && c.payment_status !== 'NONE' && (
+                                                            <button
+                                                                className="btn btn-secondary btn-sm"
+                                                                onClick={() => handleSendWarning(c.id)}
+                                                                style={{ padding: '2px 8px', fontSize: '0.8rem', minHeight: 'auto', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', border: '1px solid var(--color-warning)' }}
+                                                                title="Send warning message and email"
+                                                            >
+                                                                Warn
+                                                            </button>
+                                                        )}
+                                                        {c.meter?.status === 'ACTIVE' && (
+                                                            <button
+                                                                className="btn btn-danger btn-sm"
+                                                                onClick={() => setDeactivateModalCustomer(c)}
+                                                                style={{ padding: '2px 8px', fontSize: '0.8rem', minHeight: 'auto' }}
+                                                                title="Remotely deactivate water meter"
+                                                            >
+                                                                Deactivate
+                                                            </button>
+                                                        )}
+                                                        {c.meter?.status === 'DISCONNECTED' && (
+                                                            <button
+                                                                className="btn btn-primary btn-sm"
+                                                                onClick={() => setReactivateModalCustomer(c)}
+                                                                style={{ padding: '2px 8px', fontSize: '0.8rem', minHeight: 'auto', background: 'var(--color-success)', border: 'none', color: '#fff' }}
+                                                                title="Remotely reactivate water meter"
+                                                            >
+                                                                Reactivate
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            </>
+        );
+    };
+
     // ── Section title map ────────────────────────────────────────────────────
     const sectionTitles = {
         dashboard: { title: 'Admin Dashboard', subtitle: 'System-wide overview at a glance' },
@@ -334,6 +798,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         switch (section) {
             case 'dashboard':
                 return renderDashboard();
+            case 'payments':
+                return renderPayments();
             case 'revenue':
                 return renderRevenue();
             case 'disputes':
@@ -1253,6 +1719,136 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                             <button className="btn btn-primary btn-sm" onClick={handleFieldTaskSubmit} disabled={fieldTaskSubmitting}>
                                 {fieldTaskSubmitting ? 'Assigning...' : 'Assign Field Task'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Deactivate Meter Modal ─────────────────────────────── */}
+            {deactivateModalCustomer && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '480px' }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-danger)' }}>⚠️ Deactivate Meter</h2>
+                        <p style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                            Are you sure you want to remotely deactivate the water meter for <strong>{deactivateModalCustomer.name}</strong>?
+                        </p>
+                        <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--border-default)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                            <div>Customer ID: <code>{deactivateModalCustomer.id}</code></div>
+                            <div>Meter Number: <code>{deactivateModalCustomer.meter?.meter_number}</code></div>
+                            <div>Current Bill: <strong>ETB {deactivateModalCustomer.current_bill_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></div>
+                            <div>Status: <span className="badge badge-danger" style={{ textTransform: 'uppercase' }}>{deactivateModalCustomer.payment_status}</span></div>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                            * This action will remotely disconnect the water meter and transition its status to 'DISCONNECTED'. The customer will be notified via email and system notification.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setDeactivateModalCustomer(null)}>Cancel</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeactivateMeter(deactivateModalCustomer.id)}>Confirm Deactivation</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Reactivate Meter Modal ─────────────────────────────── */}
+            {reactivateModalCustomer && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '480px' }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-success)' }}>⚡ Reactivate Meter</h2>
+                        <p style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                            Are you sure you want to remotely reactivate the water meter for <strong>{reactivateModalCustomer.name}</strong>?
+                        </p>
+                        <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--border-default)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                            <div>Customer ID: <code>{reactivateModalCustomer.id}</code></div>
+                            <div>Meter Number: <code>{reactivateModalCustomer.meter?.meter_number}</code></div>
+                            <div>Status: <span className="badge badge-success" style={{ textTransform: 'uppercase' }}>{reactivateModalCustomer.payment_status}</span></div>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                            * This action will remotely enable the water meter and restore its status to 'ACTIVE'. The customer will receive service restoration confirmation.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setReactivateModalCustomer(null)}>Cancel</button>
+                            <button className="btn btn-primary btn-sm" style={{ background: 'var(--color-success)', border: 'none' }} onClick={() => handleReactivateMeter(reactivateModalCustomer.id)}>Confirm Reactivation</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Customer Details & Billing History Modal ─────────────── */}
+            {detailsModalCustomer && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '780px', width: '90%' }}>
+                        <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>👤 Customer Profile Details</h2>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                            <div style={{ background: 'var(--color-surface-2)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Personal Info</h3>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div><strong>Name:</strong> {detailsModalCustomer.name}</div>
+                                    <div><strong>Email:</strong> {detailsModalCustomer.email}</div>
+                                    <div><strong>Phone:</strong> {detailsModalCustomer.phone || 'N/A'}</div>
+                                    <div><strong>Class:</strong> <span style={{ textTransform: 'capitalize' }}>{detailsModalCustomer.customer_class?.toLowerCase()}</span></div>
+                                </div>
+                            </div>
+                            
+                            <div style={{ background: 'var(--color-surface-2)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Meter Info</h3>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div><strong>Meter ID:</strong> <code>{detailsModalCustomer.meter?.id || 'N/A'}</code></div>
+                                    <div><strong>Meter Number:</strong> <code>{detailsModalCustomer.meter?.meter_number}</code></div>
+                                    <div><strong>Meter Status:</strong> <span className={`badge ${getMeterBadge(detailsModalCustomer.meter?.status)}`} style={{ fontSize: '0.75rem' }}>{detailsModalCustomer.meter?.status}</span></div>
+                                    <div><strong>Zone/Area:</strong> {detailsModalCustomer.zone || 'N/A'}</div>
+                                </div>
+                            </div>
+
+                            <div style={{ background: 'var(--color-surface-2)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Billing Summary</h3>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div><strong>Payment Status:</strong> <span className={`badge ${getPaymentBadge(detailsModalCustomer.payment_status)}`} style={{ fontSize: '0.75rem' }}>{detailsModalCustomer.payment_status}</span></div>
+                                    <div><strong>Current Bill Amount:</strong> ETB {detailsModalCustomer.current_bill_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    <div><strong>Months Unpaid:</strong> {detailsModalCustomer.consecutive_unpaid_months}</div>
+                                    <div><strong>Last Payment Date:</strong> {detailsModalCustomer.last_payment_date}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>💳 Billing History</h3>
+                        <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', overflow: 'hidden', maxHeight: '250px', overflowY: 'auto', marginBottom: '1.5rem' }}>
+                            {(!detailsModalCustomer.billing_history || detailsModalCustomer.billing_history.length === 0) ? (
+                                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No billing records available for this customer.</div>
+                            ) : (
+                                <table className="data-table" style={{ margin: 0 }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--color-surface-2)' }}>
+                                            <th>Bill Date</th>
+                                            <th>Due Date</th>
+                                            <th style={{ textAlign: 'right' }}>Consumption (m³)</th>
+                                            <th style={{ textAlign: 'right' }}>Amount</th>
+                                            <th>Status</th>
+                                            <th>Paid Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {detailsModalCustomer.billing_history.map(bill => (
+                                            <tr key={bill.id}>
+                                                <td>{bill.created_at}</td>
+                                                <td>{bill.due_date}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 500 }}>{bill.consumption.toFixed(2)}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 600 }}>ETB {bill.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                                <td>
+                                                    <span className={`badge ${getPaymentBadge(bill.status)}`} style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                                                        {bill.status}
+                                                    </span>
+                                                </td>
+                                                <td>{bill.paid_at || '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setDetailsModalCustomer(null)}>Close Profile</button>
                         </div>
                     </div>
                 </div>

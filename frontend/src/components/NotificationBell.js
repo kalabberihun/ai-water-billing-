@@ -42,7 +42,7 @@ const NotificationBell = () => {
 
                 // Always fetch System Notifications for the user
                 try {
-                    const notifyRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/`, config);
+                    const notifyRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/notifications/`, config);
                     fetchedAlerts = notifyRes.data.filter(n => !n.is_read && !clickedAlerts.includes(n.id));
                 } catch (e) {
                     console.error("Failed to fetch system notifications", e);
@@ -146,7 +146,7 @@ const NotificationBell = () => {
         try {
             const tokenStr = localStorage.getItem('tokens');
             const tokenObj = JSON.parse(tokenStr);
-            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/accounts/notifications/${alertId}/read/`, {}, {
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/notifications/${alertId}/read/`, {}, {
                 headers: { Authorization: `Bearer ${tokenObj.access}` }
             });
             

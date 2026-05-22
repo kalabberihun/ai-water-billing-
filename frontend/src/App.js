@@ -117,6 +117,11 @@ function App() {
                         <AdminDashboard section="system" />
                     </PrivateRoute>
                 } />
+                <Route path="/admin/payments" element={
+                    <PrivateRoute>
+                        <AdminDashboard section="payments" />
+                    </PrivateRoute>
+                } />
                 <Route path="/technician" element={
                     <PrivateRoute>
                         <TechnicianDashboard />

@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Avg
+from django.db.models import Avg, Sum
 from .models import Bill, Payment, TariffTier, WaterAlert, Dispute
 from .serializers import BillSerializer, PaymentSerializer, DisputeSerializer
 import logging
@@ -209,17 +209,21 @@ class ConsumptionPredictionView(APIView):
         
         predicted_consumption = Decimal(str(prediction_data['predicted_consumption']))
         customer_class = customer.customer_class or 'RESIDENT'
-        tiers = TariffTier.objects.filter(customer_class=customer_class)
-        if not tiers.exists():
-            tiers = TariffTier.objects.filter(customer_class='RESIDENT')
+        tiers = list(TariffTier.objects.filter(customer_class=customer_class))
+        if not tiers:
+            tiers = list(TariffTier.objects.filter(customer_class='RESIDENT'))
             
         subtotal = Decimal('0')
         remaining = predicted_consumption
         
-        for tier in tiers:
+        for i, tier in enumerate(tiers):
             if remaining <= 0:
                 break
-            tier_usage = min(remaining, tier.max_usage - tier.min_usage)
+            if i == len(tiers) - 1:
+                # Last tier is catch-all, consume all remaining consumption
+                tier_usage = remaining
+            else:
+                tier_usage = min(remaining, tier.max_usage - tier.min_usage)
             subtotal += tier_usage * tier.price_per_unit
             remaining -= tier_usage
             
@@ -629,3 +633,294 @@ class AdminDisputeUpdateView(APIView):
         dispute.save()
 
         return Response(DisputeSerializer(dispute).data)
+
+
+class AdminCustomerPaymentsView(APIView):
+    """
+    Dashboard API for managing customer payments and meter connections.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN', 'CLERK']:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        from apps.accounts.models import Customer
+        from apps.metering.models import Meter
+
+        # Calculate KPIs
+        total_customers = Customer.objects.filter(deleted_at__isnull=True).count()
+        
+        # Paid this month (bills created/paid in the current month)
+        now = timezone.now()
+        paid_this_month = Bill.objects.filter(
+            status='PAID',
+            paid_at__year=now.year,
+            paid_at__month=now.month
+        ).count()
+
+        unpaid = Bill.objects.filter(status='UNPAID').count()
+        overdue = Bill.objects.filter(status='OVERDUE').count()
+        
+        total_revenue = Payment.objects.filter(status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        # Get customer list
+        customers = Customer.objects.filter(deleted_at__isnull=True).select_related('user').order_by('user__first_name', 'user__last_name')
+        
+        customer_data = []
+        for c in customers:
+            # Latest bill
+            latest_bill = c.bills.order_by('-created_at').first()
+            current_bill_amount = latest_bill.total_amount if latest_bill else Decimal('0.00')
+            latest_bill_date = latest_bill.created_at.strftime('%Y-%m-%d') if latest_bill else None
+            
+            # Determine payment status
+            if not latest_bill:
+                payment_status = 'NONE'
+            elif latest_bill.status == 'PAID':
+                payment_status = 'PAID'
+            else:
+                payments_total = latest_bill.payments.filter(status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                if payments_total > Decimal('0.00') and payments_total < latest_bill.total_amount:
+                    payment_status = 'PARTIAL'
+                else:
+                    payment_status = latest_bill.status
+
+            # Calculate consecutive unpaid months
+            consecutive_unpaid_months = 0
+            for bill in c.bills.order_by('-created_at'):
+                if bill.status == 'PAID':
+                    break
+                consecutive_unpaid_months += 1
+
+            # Last payment date
+            last_payment = Payment.objects.filter(bill__customer=c, status='COMPLETED').order_by('-paid_at').first()
+            last_payment_date = last_payment.paid_at.strftime('%Y-%m-%d') if (last_payment and last_payment.paid_at) else '-'
+
+            # Meter status
+            meter = c.meters.first()
+            meter_info = {
+                'id': str(meter.id) if meter else None,
+                'meter_number': meter.meter_number if meter else 'N/A',
+                'status': meter.status if meter else 'NONE'
+            }
+
+            # Billing history
+            billing_history = []
+            for bill in c.bills.order_by('-created_at'):
+                billing_history.append({
+                    'id': str(bill.id),
+                    'created_at': bill.created_at.strftime('%Y-%m-%d'),
+                    'due_date': bill.due_date.strftime('%Y-%m-%d'),
+                    'consumption': float(bill.consumption),
+                    'total_amount': float(bill.total_amount),
+                    'status': bill.status,
+                    'paid_at': bill.paid_at.strftime('%Y-%m-%d %H:%M') if bill.paid_at else None
+                })
+
+            customer_data.append({
+                'id': str(c.id),
+                'name': f"{c.user.first_name} {c.user.last_name}".strip() or c.user.email,
+                'email': c.user.email,
+                'phone': c.phone or '',
+                'zone': c.city or '',
+                'customer_class': c.customer_class,
+                'current_bill_amount': float(current_bill_amount),
+                'latest_bill_date': latest_bill_date,
+                'payment_status': payment_status,
+                'consecutive_unpaid_months': consecutive_unpaid_months,
+                'last_payment_date': last_payment_date,
+                'meter': meter_info,
+                'billing_history': billing_history
+            })
+
+        return Response({
+            'kpis': {
+                'total_customers': total_customers,
+                'paid_this_month': paid_this_month,
+                'unpaid': unpaid,
+                'overdue': overdue,
+                'total_revenue': f"{total_revenue:,.2f}"
+            },
+            'customers': customer_data
+        })
+
+    def post(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN', 'CLERK']:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        action = request.data.get('action')
+        from apps.accounts.models import Customer, SystemNotification, AuditLog
+        from apps.metering.models import Meter
+        from utils.email import send_html_email
+
+        if action == 'warn':
+            customer_id = request.data.get('customer_id')
+            try:
+                customer = Customer.objects.get(id=customer_id)
+                msg = "Dear Customer, you have outstanding water bills. Please settle them to avoid service disruption."
+                SystemNotification.objects.create(
+                    user=customer.user,
+                    alert_type='WARNING',
+                    message=msg
+                )
+                send_html_email(
+                    subject='Outstanding Water Bill Warning',
+                    template_name='emails/notification.html',
+                    context={
+                        'name': customer.user.first_name or 'Customer',
+                        'message': 'This is a warning notification that you have unpaid or overdue water bills. Please log into your dashboard and settle them as soon as possible to avoid deactivation of your meter.'
+                    },
+                    recipient_list=[customer.user.email],
+                    fail_silently=True
+                )
+                return Response({'success': True, 'message': 'Warning notification and email sent.'})
+            except Customer.DoesNotExist:
+                return Response({'error': 'Customer not found'}, status=404)
+
+        elif action == 'deactivate_meter':
+            customer_id = request.data.get('customer_id')
+            try:
+                customer = Customer.objects.get(id=customer_id)
+                meter = customer.meters.first()
+                if not meter:
+                    return Response({'error': 'No meter assigned to customer'}, status=400)
+                
+                meter.status = 'DISCONNECTED'
+                meter.save(update_fields=['status'])
+
+                # Audit Log
+                AuditLog.objects.create(
+                    user=request.user,
+                    action="DEACTIVATE_METER",
+                    entity_type="Meter",
+                    entity_id=str(meter.id),
+                    ip_address=request.META.get('REMOTE_ADDR', '0.0.0.0'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    metadata={"customer_id": str(customer.id), "meter_number": meter.meter_number}
+                )
+
+                # Notification & Email
+                msg = "Your water meter has been remotely deactivated due to unpaid bills. Please pay to reactivate."
+                SystemNotification.objects.create(
+                    user=customer.user,
+                    alert_type='WARNING',
+                    message=msg
+                )
+                send_html_email(
+                    subject='Water Meter Deactivated',
+                    template_name='emails/notification.html',
+                    context={
+                        'name': customer.user.first_name or 'Customer',
+                        'message': 'Your water meter has been remotely deactivated due to unpaid bills. Please settle all overdue payments to reactivate your connection.'
+                    },
+                    recipient_list=[customer.user.email],
+                    fail_silently=True
+                )
+                return Response({'success': True, 'message': 'Meter deactivated.'})
+            except Customer.DoesNotExist:
+                return Response({'error': 'Customer not found'}, status=404)
+
+        elif action == 'reactivate_meter':
+            customer_id = request.data.get('customer_id')
+            try:
+                customer = Customer.objects.get(id=customer_id)
+                meter = customer.meters.first()
+                if not meter:
+                    return Response({'error': 'No meter assigned to customer'}, status=400)
+                
+                meter.status = 'ACTIVE'
+                meter.save(update_fields=['status'])
+
+                # Audit Log
+                AuditLog.objects.create(
+                    user=request.user,
+                    action="REACTIVATE_METER",
+                    entity_type="Meter",
+                    entity_id=str(meter.id),
+                    ip_address=request.META.get('REMOTE_ADDR', '0.0.0.0'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    metadata={"customer_id": str(customer.id), "meter_number": meter.meter_number}
+                )
+
+                # Notification & Email
+                msg = "Your water meter has been reactivated. Thank you for your payment."
+                SystemNotification.objects.create(
+                    user=customer.user,
+                    alert_type='INFO',
+                    message=msg
+                )
+                send_html_email(
+                    subject='Water Meter Reactivated',
+                    template_name='emails/notification.html',
+                    context={
+                        'name': customer.user.first_name or 'Customer',
+                        'message': 'Your water meter has been successfully reactivated. Thank you for keeping your billing status up to date!'
+                    },
+                    recipient_list=[customer.user.email],
+                    fail_silently=True
+                )
+                return Response({'success': True, 'message': 'Meter reactivated.'})
+            except Customer.DoesNotExist:
+                return Response({'error': 'Customer not found'}, status=404)
+
+        elif action == 'bulk_warn':
+            customer_ids = request.data.get('customer_ids', [])
+            sent_count = 0
+            for customer_id in customer_ids:
+                try:
+                    customer = Customer.objects.get(id=customer_id)
+                    msg = "Dear Customer, you have outstanding water bills. Please settle them to avoid service disruption."
+                    SystemNotification.objects.create(
+                        user=customer.user,
+                        alert_type='WARNING',
+                        message=msg
+                    )
+                    send_html_email(
+                        subject='Outstanding Water Bill Warning',
+                        template_name='emails/notification.html',
+                        context={
+                            'name': customer.user.first_name or 'Customer',
+                            'message': 'This is a warning notification that you have unpaid or overdue water bills. Please settle them as soon as possible to avoid deactivation of your meter.'
+                        },
+                        recipient_list=[customer.user.email],
+                        fail_silently=True
+                    )
+                    sent_count += 1
+                except Customer.DoesNotExist:
+                    continue
+            return Response({'success': True, 'message': f'Bulk warnings sent to {sent_count} customers.'})
+
+        elif action == 'bulk_flag':
+            customer_ids = request.data.get('customer_ids', [])
+            flagged_count = 0
+            for customer_id in customer_ids:
+                try:
+                    customer = Customer.objects.get(id=customer_id)
+                    
+                    # Audit Log
+                    AuditLog.objects.create(
+                        user=request.user,
+                        action="FLAG_FOR_REVIEW",
+                        entity_type="Customer",
+                        entity_id=str(customer.id),
+                        ip_address=request.META.get('REMOTE_ADDR', '0.0.0.0'),
+                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        metadata={"flagged_reason": "Bulk administrator review flag"}
+                    )
+
+                    msg = "Your account has been flagged for administrative review due to outstanding billing history. Please contact support."
+                    SystemNotification.objects.create(
+                        user=customer.user,
+                        alert_type='WARNING',
+                        message=msg
+                    )
+                    flagged_count += 1
+                except Customer.DoesNotExist:
+                    continue
+            return Response({'success': True, 'message': f'{flagged_count} accounts flagged for review.'})
+
+        else:
+            return Response({'error': 'Invalid action'}, status=400)
