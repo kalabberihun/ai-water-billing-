@@ -59,14 +59,45 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+import urllib.parse
+
+db_host_env = os.environ.get('DB_HOST', 'localhost')
+db_url_env = os.environ.get('DATABASE_URL', '')
+db_uri = db_url_env if (db_url_env.startswith('postgresql://') or db_url_env.startswith('postgres://')) else db_host_env
+
+if db_uri.startswith('postgresql://') or db_uri.startswith('postgres://'):
+    urllib.parse.uses_netloc.append("postgres")
+    urllib.parse.uses_netloc.append("postgresql")
+    url = urllib.parse.urlparse(db_uri)
+    
+    db_user = url.username or 'postgres'
+    db_password = url.password or 'postgres'
+    # Strip accidental brackets if the user kept the [YOUR-PASSWORD] placeholders literally
+    if db_password.startswith('[') and db_password.endswith(']'):
+        db_password = db_password[1:-1]
+        
+    db_host = url.hostname or 'localhost'
+    db_port = str(url.port or '5432')
+    db_name = url.path[1:] if url.path else 'postgres'
+else:
+    db_user = os.environ.get('DB_USER', 'postgres')
+    db_password = os.environ.get('DB_PASSWORD', 'postgres')
+    db_host = db_host_env
+    db_port = os.environ.get('DB_PORT', '5432')
+    db_name = os.environ.get('DB_NAME', 'ai_water_billing')
+    
+    # Strip accidental brackets from password if set in separate DB_PASSWORD env var
+    if db_password.startswith('[') and db_password.endswith(']'):
+        db_password = db_password[1:-1]
+
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.environ.get('DB_NAME', 'ai_water_billing'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': db_name,
+        'USER': db_user,
+        'PASSWORD': db_password,
+        'HOST': db_host,
+        'PORT': db_port,
     }
 }
 
