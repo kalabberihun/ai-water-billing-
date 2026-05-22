@@ -175,16 +175,51 @@ JWT_ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
 JWT_REFRESH_TOKEN_LIFETIME = timedelta(days=7)
 
 # Load keys from files
-import os
+secrets_dir = BASE_DIR.parent / 'secrets'
+private_key_path = secrets_dir / 'jwt_private.pem'
+public_key_path = secrets_dir / 'jwt_public.pem'
+
+if not os.path.exists(secrets_dir):
+    try:
+        os.makedirs(secrets_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create secrets directory: {e}")
+
+if not os.path.exists(private_key_path) or not os.path.exists(public_key_path):
+    print("JWT keys not found. Automatically generating RS256 keys...")
+    try:
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+        
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        public_key = private_key.public_key()
+        
+        with open(private_key_path, 'wb') as f:
+            f.write(private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+            
+        with open(public_key_path, 'wb') as f:
+            f.write(public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            ))
+        print("JWT keys generated successfully!")
+    except Exception as e:
+        print(f"Error generating JWT keys: {e}")
+
 try:
-    with open(BASE_DIR.parent / 'secrets' / 'jwt_private.pem') as f:
+    with open(private_key_path) as f:
         JWT_PRIVATE_KEY = f.read()
-    with open(BASE_DIR.parent / 'secrets' / 'jwt_public.pem') as f:
+    with open(public_key_path) as f:
         JWT_PUBLIC_KEY = f.read()
-except FileNotFoundError:
-    print("Warning: JWT keys not found. Run key generation script.")
+except Exception as e:
+    print(f"Warning: Could not load JWT keys: {e}")
     JWT_PRIVATE_KEY = None
     JWT_PUBLIC_KEY = None
+
 
 # Celery Configuration
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
