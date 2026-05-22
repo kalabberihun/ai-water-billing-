@@ -135,3 +135,28 @@ class EmailVerification(models.Model):
 
     def __str__(self):
         return f"OTP for {self.user.email} ({'used' if self.is_used else 'active'})"
+
+
+class SystemSetting(models.Model):
+    """Simple key-value store for system-wide settings."""
+    key = models.CharField(max_length=100, unique=True, primary_key=True)
+    value = models.TextField(default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'system_settings'
+
+    def __str__(self):
+        return f"{self.key} = {self.value}"
+
+    @classmethod
+    def get(cls, key, default=''):
+        try:
+            return cls.objects.get(key=key).value
+        except cls.DoesNotExist:
+            return default
+
+    @classmethod
+    def set(cls, key, value):
+        obj, _ = cls.objects.update_or_create(key=key, defaults={'value': value})
+        return obj

@@ -10,6 +10,7 @@ const Bills = () => {
         nextDueDate: 'N/A'
     });
     const [payingBillId, setPayingBillId] = useState(null);
+    const [systemActive, setSystemActive] = useState(true);
     const [showDisputeModal, setShowDisputeModal] = useState(false);
     const [disputeBillId, setDisputeBillId] = useState(null);
     const [disputeReason, setDisputeReason] = useState('');
@@ -17,6 +18,7 @@ const Bills = () => {
 
     useEffect(() => {
         const fetchBills = async () => {
+            const url_base = process.env.REACT_APP_API_URL || 'http://localhost:8000';
             try {
                 const tokenObj = JSON.parse(localStorage.getItem('tokens'));
                 const config = { headers: { Authorization: `Bearer ${tokenObj?.access}` } };
@@ -56,6 +58,14 @@ const Bills = () => {
                     totalPaid: paid,
                     nextDueDate: formattedDueDate
                 });
+
+                // Fetch system control status
+                try {
+                    const sysRes = await axios.get(`${url_base}/api/auth/admin/system-control`, config);
+                    setSystemActive(sysRes.data.system_active);
+                } catch (sysErr) {
+                    console.error("Error fetching system control status:", sysErr);
+                }
 
             } catch (error) {
                 console.error("Error fetching bills:", error);
@@ -172,10 +182,39 @@ const Bills = () => {
                         <h1 className="content-title">Bills & Payments</h1>
                         <p className="content-subtitle">Track your billing history and make payments</p>
                     </div>
-                    <button className="btn btn-primary btn-sm">💳 Pay Now</button>
+                    <button 
+                        className="btn btn-primary btn-sm"
+                        disabled={!systemActive}
+                        style={{ opacity: !systemActive ? 0.6 : 1, cursor: !systemActive ? 'not-allowed' : 'pointer' }}
+                    >
+                        💳 Pay Now
+                    </button>
                 </div>
 
                 <div className="content-body">
+                    {/* System Deactivation Warning Banner */}
+                    {!systemActive && (
+                        <div style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid var(--color-danger)',
+                            borderRadius: '12px',
+                            padding: '1rem 1.5rem',
+                            marginBottom: '2rem',
+                            color: 'var(--color-danger)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            fontSize: '0.95rem',
+                            fontWeight: 500,
+                            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)'
+                        }}>
+                            <span>⚠️</span>
+                            <div>
+                                <strong>System Deactivated:</strong> The billing system has been temporarily deactivated by the administration. Meter reading submissions and bill payments are currently locked.
+                            </div>
+                        </div>
+                    )}
+
                     {/* Summary Stats */}
                     <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                         <div className="stat-card blue">
@@ -254,11 +293,16 @@ const Bills = () => {
                                                 {isUnpaid && (
                                                     <button
                                                         onClick={() => handlePayChapa(bill.id)}
-                                                        disabled={payingBillId === bill.id || bill.status === 'PROCESSING'}
+                                                        disabled={!systemActive || payingBillId === bill.id || bill.status === 'PROCESSING'}
                                                         className={`btn ${bill.status === 'OVERDUE' ? 'btn-danger' : bill.status === 'PROCESSING' ? 'btn-secondary' : 'btn-primary'} btn-sm`}
-                                                        style={{ width: '100%', marginTop: 'var(--space-sm)' }}
+                                                        style={{ 
+                                                            width: '100%', 
+                                                            marginTop: 'var(--space-sm)',
+                                                            opacity: !systemActive ? 0.6 : 1,
+                                                            cursor: !systemActive ? 'not-allowed' : 'pointer'
+                                                        }}
                                                     >
-                                                        {payingBillId === bill.id ? '⏳ Connecting to Chapa...' : bill.status === 'PROCESSING' ? '🔄 Payment Processing...' : `💳 Pay ETB ${formattedAmount}`}
+                                                        {!systemActive ? '🔒 Payments Disabled' : payingBillId === bill.id ? '⏳ Connecting to Chapa...' : bill.status === 'PROCESSING' ? '🔄 Payment Processing...' : `💳 Pay ETB ${formattedAmount}`}
                                                     </button>
                                                 )}
                                                 

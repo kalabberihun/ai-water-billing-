@@ -32,6 +32,14 @@ class BillDetailView(generics.RetrieveAPIView):
 
 class PaymentCreateView(APIView):
     def post(self, request):
+        # Check system active
+        from apps.accounts.models import SystemSetting
+        if SystemSetting.get('billing_system_active', 'true') != 'true':
+            return Response(
+                {'error': 'The water billing system is temporarily deactivated. Bill payments are currently unavailable.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         bill_id = request.data.get('bill_id')
         try:
             bill = Bill.objects.get(id=bill_id)
@@ -270,6 +278,14 @@ class MpesaSimulationView(APIView):
     """Simulates an M-Pesa STK Push and a background webhook callback."""
     
     def post(self, request):
+        # Check system active
+        from apps.accounts.models import SystemSetting
+        if SystemSetting.get('billing_system_active', 'true') != 'true':
+            return Response(
+                {'error': 'The water billing system is temporarily deactivated. Bill payments are currently unavailable.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         bill_id = request.data.get('bill_id')
         phone = request.data.get('phone', '254700000000')
         
@@ -334,6 +350,14 @@ class ChapaInitializeView(APIView):
     """
 
     def post(self, request):
+        # Check system active
+        from apps.accounts.models import SystemSetting
+        if SystemSetting.get('billing_system_active', 'true') != 'true':
+            return Response(
+                {'error': 'The water billing system is temporarily deactivated. Bill payments are currently unavailable.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         bill_id = request.data.get('bill_id')
         if not bill_id:
             return Response({'error': 'bill_id is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -677,7 +701,7 @@ class AdminCustomerPaymentsView(APIView):
             
             # Determine payment status
             if not latest_bill:
-                payment_status = 'NONE'
+                payment_status = 'UNPAID'
             elif latest_bill.status == 'PAID':
                 payment_status = 'PAID'
             else:
@@ -686,12 +710,31 @@ class AdminCustomerPaymentsView(APIView):
                     payment_status = 'PARTIAL'
                 else:
                     payment_status = latest_bill.status
+                
+                # Payment Status should change to 'DUE' if it passes its due_date (monthly boundary) and is not paid
+                if latest_bill.due_date and timezone.now().date() > latest_bill.due_date:
+                    payment_status = 'DUE'
 
-            # Calculate consecutive unpaid months
+            # Calculate consecutive unpaid months (counting current calendar month as unpaid if not paid)
+            current_month_bill = c.bills.filter(
+                created_at__year=now.year,
+                created_at__month=now.month
+            ).first()
+
             consecutive_unpaid_months = 0
+            if not current_month_bill:
+                # No bill has been generated/paid for the current month yet; count current month as unpaid.
+                consecutive_unpaid_months = 1
+            elif current_month_bill.status != 'PAID':
+                # A bill exists for the current month, but it is not paid yet.
+                pass
+
             for bill in c.bills.order_by('-created_at'):
                 if bill.status == 'PAID':
                     break
+                # Avoid double counting if a bill for the current month is encountered in the loop when we already added 1.
+                if not current_month_bill and bill.created_at.year == now.year and bill.created_at.month == now.month:
+                    continue
                 consecutive_unpaid_months += 1
 
             # Last payment date
@@ -758,25 +801,37 @@ class AdminCustomerPaymentsView(APIView):
 
         if action == 'warn':
             customer_id = request.data.get('customer_id')
+            warning_type = request.data.get('warning_type', 'standard')
             try:
                 customer = Customer.objects.get(id=customer_id)
-                msg = "Dear Customer, you have outstanding water bills. Please settle them to avoid service disruption."
+                unpaid_count = customer.bills.filter(status__in=['UNPAID', 'OVERDUE']).count()
+                
+                if warning_type == 'urgent':
+                    subject = 'URGENT: Outstanding Water Bill Notice'
+                    msg = f"Dear Customer, you have {unpaid_count} unpaid/overdue water bill(s). Please settle them immediately to avoid remote deactivation of your meter."
+                elif warning_type == 'disconnection':
+                    subject = 'FINAL NOTICE: Water Meter Disconnection Warning'
+                    msg = f"FINAL NOTICE: Your water meter is scheduled for remote deactivation due to {unpaid_count} unpaid/overdue bill(s). Please settle them now to prevent service cutoff."
+                else:
+                    subject = 'Outstanding Water Bill Warning'
+                    msg = f"Dear Customer, you have {unpaid_count} unpaid/overdue water bill(s). Please settle them as soon as possible to avoid service disruption."
+
                 SystemNotification.objects.create(
                     user=customer.user,
                     alert_type='WARNING',
                     message=msg
                 )
                 send_html_email(
-                    subject='Outstanding Water Bill Warning',
+                    subject=subject,
                     template_name='emails/notification.html',
                     context={
                         'name': customer.user.first_name or 'Customer',
-                        'message': 'This is a warning notification that you have unpaid or overdue water bills. Please log into your dashboard and settle them as soon as possible to avoid deactivation of your meter.'
+                        'message': msg
                     },
                     recipient_list=[customer.user.email],
                     fail_silently=True
                 )
-                return Response({'success': True, 'message': 'Warning notification and email sent.'})
+                return Response({'success': True, 'message': f'{warning_type.capitalize()} warning notification and email sent.'})
             except Customer.DoesNotExist:
                 return Response({'error': 'Customer not found'}, status=404)
 
@@ -868,22 +923,34 @@ class AdminCustomerPaymentsView(APIView):
 
         elif action == 'bulk_warn':
             customer_ids = request.data.get('customer_ids', [])
+            warning_type = request.data.get('warning_type', 'standard')
             sent_count = 0
             for customer_id in customer_ids:
                 try:
                     customer = Customer.objects.get(id=customer_id)
-                    msg = "Dear Customer, you have outstanding water bills. Please settle them to avoid service disruption."
+                    unpaid_count = customer.bills.filter(status__in=['UNPAID', 'OVERDUE']).count()
+                    
+                    if warning_type == 'urgent':
+                        subject = 'URGENT: Outstanding Water Bill Notice'
+                        msg = f"Dear Customer, you have {unpaid_count} unpaid/overdue water bill(s). Please settle them immediately to avoid remote deactivation of your meter."
+                    elif warning_type == 'disconnection':
+                        subject = 'FINAL NOTICE: Water Meter Disconnection Warning'
+                        msg = f"FINAL NOTICE: Your water meter is scheduled for remote deactivation due to {unpaid_count} unpaid/overdue bill(s). Please settle them now to prevent service cutoff."
+                    else:
+                        subject = 'Outstanding Water Bill Warning'
+                        msg = f"Dear Customer, you have {unpaid_count} unpaid/overdue water bill(s). Please settle them as soon as possible to avoid service disruption."
+
                     SystemNotification.objects.create(
                         user=customer.user,
                         alert_type='WARNING',
                         message=msg
                     )
                     send_html_email(
-                        subject='Outstanding Water Bill Warning',
+                        subject=subject,
                         template_name='emails/notification.html',
                         context={
                             'name': customer.user.first_name or 'Customer',
-                            'message': 'This is a warning notification that you have unpaid or overdue water bills. Please settle them as soon as possible to avoid deactivation of your meter.'
+                            'message': msg
                         },
                         recipient_list=[customer.user.email],
                         fail_silently=True
@@ -891,7 +958,7 @@ class AdminCustomerPaymentsView(APIView):
                     sent_count += 1
                 except Customer.DoesNotExist:
                     continue
-            return Response({'success': True, 'message': f'Bulk warnings sent to {sent_count} customers.'})
+            return Response({'success': True, 'message': f'Bulk {warning_type} warnings sent to {sent_count} customers.'})
 
         elif action == 'bulk_flag':
             customer_ids = request.data.get('customer_ids', [])

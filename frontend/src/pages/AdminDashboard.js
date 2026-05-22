@@ -130,6 +130,14 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     const [deactivateModalCustomer, setDeactivateModalCustomer] = useState(null);
     const [reactivateModalCustomer, setReactivateModalCustomer] = useState(null);
     const [detailsModalCustomer, setDetailsModalCustomer] = useState(null);
+    const [warnModalCustomer, setWarnModalCustomer] = useState(null);
+    const [warnType, setWarnType] = useState('standard');
+    const [bulkWarnModal, setBulkWarnModal] = useState(false);
+    const [bulkWarnType, setBulkWarnType] = useState('standard');
+
+    // Global billing system control state
+    const [systemActive, setSystemActive] = useState(true);
+    const [systemControlLoading, setSystemControlLoading] = useState(false);
 
     const getConfig = () => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
@@ -138,14 +146,15 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
 
     const fetchData = async () => {
         try {
-            const [statsRes, readingsRes, disputesRes, usersRes, tasksRes, metersRes, paymentsRes] = await Promise.all([
+            const [statsRes, readingsRes, disputesRes, usersRes, tasksRes, metersRes, paymentsRes, systemRes] = await Promise.all([
                 axios.get(`${API}/api/auth/admin/stats`, getConfig()),
                 axios.get(`${API}/api/auth/admin/pending-readings`, getConfig()),
                 axios.get(`${API}/api/auth/admin/disputes`, getConfig()),
                 axios.get(`${API}/api/auth/admin/users`, getConfig()),
                 axios.get(`${API}/api/metering/admin/maintenance`, getConfig()),
                 axios.get(`${API}/api/metering/meters`, getConfig()),
-                axios.get(`${API}/api/billing/admin/customer-payments`, getConfig())
+                axios.get(`${API}/api/billing/admin/customer-payments`, getConfig()),
+                axios.get(`${API}/api/auth/admin/system-control`, getConfig())
             ]);
             setStats(statsRes.data);
             setPendingReadings(readingsRes.data);
@@ -156,6 +165,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
             setAllMeters(metersRes.data.results || metersRes.data);
             setCustomerPayments(paymentsRes.data.customers || []);
             setPaymentKpis(paymentsRes.data.kpis || {});
+            setSystemActive(systemRes.data.system_active);
         } catch (error) {
             console.error('Error fetching admin data:', error);
         } finally {
@@ -337,14 +347,16 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     };
 
     // ── Customer Payments Action Handlers ─────────────────────────────────────
-    const handleSendWarning = async (customerId) => {
+    const handleSendWarning = async (customerId, type = 'standard') => {
         try {
             const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
                 action: 'warn',
-                customer_id: customerId
+                customer_id: customerId,
+                warning_type: type
             }, getConfig());
             if (res.data.success) {
                 alert('Warning notification and email sent successfully!');
+                setWarnModalCustomer(null);
                 fetchData();
             } else {
                 alert('Action failed: ' + (res.data.error || 'Unknown error'));
@@ -390,17 +402,18 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         }
     };
 
-    const handleBulkWarn = async () => {
+    const handleBulkWarn = async (type = 'standard') => {
         if (selectedCustomers.length === 0) return;
-        if (!window.confirm(`Are you sure you want to send warning notifications and emails to the ${selectedCustomers.length} selected customers?`)) return;
         try {
             const res = await axios.post(`${API}/api/billing/admin/customer-payments`, {
                 action: 'bulk_warn',
-                customer_ids: selectedCustomers
+                customer_ids: selectedCustomers,
+                warning_type: type
             }, getConfig());
             if (res.data.success) {
                 alert(res.data.message || 'Bulk warnings sent successfully!');
                 setSelectedCustomers([]);
+                setBulkWarnModal(false);
                 fetchData();
             } else {
                 alert('Action failed: ' + (res.data.error || 'Unknown error'));
@@ -430,10 +443,367 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
         }
     };
 
+    const handleToggleSystem = async (action) => {
+        if (!window.confirm(`Are you sure you want to ${action === 'activate' ? 'ACTIVATE' : 'DEACTIVATE'} the global water billing system? This will send bulk notifications/emails to all active customers.`)) {
+            return;
+        }
+        setSystemControlLoading(true);
+        try {
+            const res = await axios.post(`${API}/api/auth/admin/system-control`, { action }, getConfig());
+            if (res.data.success) {
+                setSystemActive(res.data.system_active);
+                alert(res.data.message);
+            } else {
+                alert('Failed to toggle system status: ' + (res.data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error toggling system status: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setSystemControlLoading(false);
+        }
+    };
+
+    const renderSystemControlPanel = () => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        
+        // Month and Year label
+        const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        // Next Activation: 5th of next month or 5th of current month
+        let nextActivation = new Date(currentYear, currentMonth, 5);
+        if (now.getDate() > 5) {
+            nextActivation = new Date(currentYear, currentMonth + 1, 5);
+        }
+        
+        // Next Deactivation: last day of the current month
+        const nextDeactivation = new Date(currentYear, currentMonth + 1, 0);
+
+        // Calendar calculations
+        const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+        const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+        
+        const days = [];
+        for (let i = 0; i < firstDayIndex; i++) {
+            days.push(null);
+        }
+        for (let d = 1; d <= totalDays; d++) {
+            days.push(d);
+        }
+
+        return (
+            <div style={{
+                background: 'var(--bg-glass)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid var(--border-default)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                marginBottom: '2rem',
+                boxShadow: 'var(--shadow-md)',
+                backgroundImage: 'var(--gradient-surface)',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                {/* Background glowing/pulse effect based on active state */}
+                <div style={{
+                    position: 'absolute',
+                    top: '-50px',
+                    right: '-50px',
+                    width: '150px',
+                    height: '150px',
+                    borderRadius: '50%',
+                    background: systemActive ? 'var(--color-success)' : 'var(--color-danger)',
+                    opacity: 0.08,
+                    filter: 'blur(40px)',
+                    pointerEvents: 'none'
+                }} />
+
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gap: '2rem',
+                    alignItems: 'start',
+                    position: 'relative',
+                    zIndex: 1
+                }}>
+                    {/* Left Column: System Control Info & Buttons */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                            <div style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '12px',
+                                background: systemActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.75rem',
+                                boxShadow: systemActive ? '0 0 15px rgba(16, 185, 129, 0.2)' : '0 0 15px rgba(239, 68, 68, 0.2)',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                {systemActive ? '💧' : '🔒'}
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
+                                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)', fontFamily: 'Sora, sans-serif' }}>
+                                        Global Billing System Control
+                                    </h3>
+                                    <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: systemActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                        color: systemActive ? 'var(--color-success)' : 'var(--color-danger)',
+                                        padding: '3px 10px',
+                                        borderRadius: '9999px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.05em'
+                                    }}>
+                                        <span style={{
+                                            width: '6px',
+                                            height: '6px',
+                                            borderRadius: '50%',
+                                            background: systemActive ? 'var(--color-success)' : 'var(--color-danger)',
+                                            display: 'inline-block',
+                                            animation: 'pulse 1.5s infinite'
+                                        }} />
+                                        {systemActive ? 'Active' : 'Deactivated'}
+                                    </span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                                    {systemActive 
+                                        ? 'Customers can scan water meters, upload readings, and receive system notifications/emails.' 
+                                        : 'Water meter reading submissions are locked. Customer scanning is temporarily blocked.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => handleToggleSystem('activate')}
+                                disabled={systemActive || systemControlLoading}
+                                style={{
+                                    background: systemActive ? 'var(--color-surface-2)' : 'var(--gradient-accent)',
+                                    color: systemActive ? 'var(--text-secondary)' : 'var(--color-text-inverse)',
+                                    border: systemActive ? '1px solid var(--border-default)' : 'none',
+                                    opacity: systemActive ? 0.6 : 1,
+                                    cursor: systemActive ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    fontWeight: 600,
+                                    padding: '0.6rem 1.25rem',
+                                    borderRadius: '10px',
+                                    boxShadow: !systemActive ? '0 4px 12px rgba(0, 180, 216, 0.2)' : 'none',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                ⚡ Activate System
+                            </button>
+                            <button
+                                className="btn btn-danger"
+                                onClick={() => handleToggleSystem('deactivate')}
+                                disabled={!systemActive || systemControlLoading}
+                                style={{
+                                    background: !systemActive ? 'var(--color-surface-2)' : 'var(--color-danger)',
+                                    color: !systemActive ? 'var(--text-secondary)' : '#fff',
+                                    border: !systemActive ? '1px solid var(--border-default)' : 'none',
+                                    opacity: !systemActive ? 0.6 : 1,
+                                    cursor: !systemActive ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    fontWeight: 600,
+                                    padding: '0.6rem 1.25rem',
+                                    borderRadius: '10px',
+                                    boxShadow: systemActive ? '0 4px 12px rgba(239, 68, 68, 0.2)' : 'none',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                🔒 Deactivate System
+                            </button>
+                        </div>
+
+                        {/* Text Schedule Info */}
+                        <div style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px dashed var(--border-default)',
+                            borderRadius: '12px',
+                            padding: '1rem',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-secondary)'
+                        }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                📅 Automatic Schedule Reminders
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                <div>🔄 <strong>Reactivation:</strong> Occurs automatically on the <strong style={{ color: 'var(--color-success)' }}>5th day</strong> of the month.</div>
+                                <div>🛑 <strong>Deactivation:</strong> Occurs automatically on the <strong style={{ color: 'var(--color-danger)' }}>last day</strong> of the month.</div>
+                                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.4rem', marginTop: '0.2rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div>⏰ <strong>Next Deactivation:</strong> {nextDeactivation.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                                    <div>⏰ <strong>Next Activation:</strong> {nextActivation.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Visual Calendar Grid */}
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: '16px',
+                        padding: '1.25rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem',
+                        boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.1)'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', fontFamily: 'Sora, sans-serif' }}>
+                                {monthLabel}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-body)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-default)' }}>
+                                Auto-cycle Calendar
+                            </span>
+                        </div>
+
+                        {/* Calendar Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center' }}>
+                            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
+                                <div key={w} style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', paddingBottom: '4px' }}>
+                                    {w}
+                                </div>
+                            ))}
+                            {days.map((day, idx) => {
+                                if (day === null) {
+                                    return <div key={`empty-${idx}`} />;
+                                }
+
+                                const isToday = day === now.getDate();
+                                const isActivation = day === 5;
+                                const isDeactivation = day === totalDays;
+
+                                let dayStyle = {
+                                    fontSize: '0.8rem',
+                                    fontWeight: 500,
+                                    height: '28px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '6px',
+                                    position: 'relative',
+                                    transition: 'all 0.15s ease',
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    color: 'var(--text-secondary)',
+                                    border: '1px solid transparent'
+                                };
+
+                                let dayTitle = `Day ${day}`;
+
+                                if (isActivation) {
+                                    dayStyle = {
+                                        ...dayStyle,
+                                        background: 'rgba(16, 185, 129, 0.2)',
+                                        border: '1.5px solid var(--color-success)',
+                                        color: 'var(--color-success)',
+                                        fontWeight: '700',
+                                        boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)'
+                                    };
+                                    dayTitle = "Automatic System Activation (5th)";
+                                } else if (isDeactivation) {
+                                    dayStyle = {
+                                        ...dayStyle,
+                                        background: 'rgba(239, 68, 68, 0.2)',
+                                        border: '1.5px solid var(--color-danger)',
+                                        color: 'var(--color-danger)',
+                                        fontWeight: '700',
+                                        boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
+                                    };
+                                    dayTitle = "Automatic System Deactivation (Last Day)";
+                                } else if (isToday) {
+                                    dayStyle = {
+                                        ...dayStyle,
+                                        border: '1.5px dashed var(--primary-400)',
+                                        color: 'var(--primary-400)',
+                                        fontWeight: '700',
+                                        background: 'rgba(59, 130, 246, 0.08)'
+                                    };
+                                    dayTitle = "Today";
+                                }
+
+                                return (
+                                    <div
+                                        key={`day-${day}`}
+                                        style={dayStyle}
+                                        title={dayTitle}
+                                        onMouseEnter={e => {
+                                            if (!isActivation && !isDeactivation) {
+                                                e.target.style.background = 'rgba(255,255,255,0.08)';
+                                                e.target.style.color = 'var(--text-primary)';
+                                            }
+                                        }}
+                                        onMouseLeave={e => {
+                                            if (!isActivation && !isDeactivation) {
+                                                e.target.style.background = 'rgba(255, 255, 255, 0.02)';
+                                                e.target.style.color = 'var(--text-secondary)';
+                                            }
+                                        }}
+                                    >
+                                        {day}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Legend */}
+                        <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            fontSize: '0.75rem',
+                            borderTop: '1px solid var(--border-subtle)',
+                            paddingTop: '0.5rem',
+                            marginTop: '0.25rem',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-success)', display: 'inline-block' }} />
+                                <span>Activation (5th)</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-danger)', display: 'inline-block' }} />
+                                <span>Deactivation (Last)</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '8px', height: '8px', border: '1px dashed var(--primary-400)', borderRadius: '2px', display: 'inline-block' }} />
+                                <span>Today</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Inject keyframes dynamically to make standard CSS animations work without external file changes */}
+                <style dangerouslySetInnerHTML={{__html: `
+                    @keyframes pulse {
+                        0% { transform: scale(0.9); opacity: 0.6; }
+                        50% { transform: scale(1.2); opacity: 1; }
+                        100% { transform: scale(0.9); opacity: 0.6; }
+                    }
+                `}} />
+            </div>
+        );
+    };
+
     const getPaymentBadge = (status) => {
         const map = {
             'PAID': 'badge-success',
             'UNPAID': 'badge-warning',
+            'DUE': 'badge-danger',
             'OVERDUE': 'badge-danger',
             'PARTIAL': 'badge-info',
             'NONE': 'badge-secondary'
@@ -567,6 +937,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 <option value="">-- All Payment Statuses --</option>
                                 <option value="PAID">Paid</option>
                                 <option value="UNPAID">Unpaid</option>
+                                <option value="DUE">Due</option>
                                 <option value="OVERDUE">Overdue</option>
                                 <option value="PARTIAL">Partial</option>
                                 <option value="NONE">No Bills</option>
@@ -630,7 +1001,10 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                             <button
                                 className="btn btn-primary btn-sm"
-                                onClick={handleBulkWarn}
+                                onClick={() => {
+                                    setBulkWarnModal(true);
+                                    setBulkWarnType('standard');
+                                }}
                                 style={{ background: 'var(--color-warning)', border: 'none', color: '#fff', fontWeight: 600 }}
                             >
                                 ✉ Bulk Send Warning
@@ -738,7 +1112,10 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                                         {c.payment_status !== 'PAID' && c.payment_status !== 'NONE' && (
                                                             <button
                                                                 className="btn btn-secondary btn-sm"
-                                                                onClick={() => handleSendWarning(c.id)}
+                                                                onClick={() => {
+                                                                    setWarnModalCustomer(c);
+                                                                    setWarnType('standard');
+                                                                }}
                                                                 style={{ padding: '2px 8px', fontSize: '0.8rem', minHeight: 'auto', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', border: '1px solid var(--color-warning)' }}
                                                                 title="Send warning message and email"
                                                             >
@@ -782,6 +1159,7 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     // ── Section title map ────────────────────────────────────────────────────
     const sectionTitles = {
         dashboard: { title: 'Admin Dashboard', subtitle: 'System-wide overview at a glance' },
+        payments: { title: 'Customer Payments & Connection Status', subtitle: 'Manage billing notifications, payment status, and system activation states' },
         revenue: { title: 'Revenue & Collections', subtitle: 'Track income trends and collection rates' },
         disputes: { title: 'Dispute Review Queue', subtitle: 'Review and resolve customer billing disputes' },
         readings: { title: 'Meter Reading Review', subtitle: 'Review, verify, and assign meter readings' },
@@ -1364,10 +1742,12 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     // ═══════════════════════════════════════════════════════════════════════════
 
     const renderSystem = () => (
-        <div className="panel" style={{ marginBottom: '2rem' }}>
-            <div className="panel-header">
-                <h2 className="panel-title">System Management</h2>
-            </div>
+        <>
+            {renderSystemControlPanel()}
+            <div className="panel" style={{ marginBottom: '2rem' }}>
+                <div className="panel-header">
+                    <h2 className="panel-title">System Management</h2>
+                </div>
             <div className="panel-body">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
                     {/* Accounts */}
@@ -1483,7 +1863,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                 </div>
             </div>
         </div>
-    );
+    </>
+);
 
     return (
         <div className="app-layout">
@@ -1768,6 +2149,149 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button className="btn btn-secondary btn-sm" onClick={() => setReactivateModalCustomer(null)}>Cancel</button>
                             <button className="btn btn-primary btn-sm" style={{ background: 'var(--color-success)', border: 'none' }} onClick={() => handleReactivateMeter(reactivateModalCustomer.id)}>Confirm Reactivation</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Single Warning Options Modal ─────────────────────────────── */}
+            {warnModalCustomer && (
+                <div className="modal-overlay" style={{ zIndex: 1001 }}>
+                    <div className="modal-content" style={{ maxWidth: '520px', width: '90%' }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            ✉️ Send Outstanding Bill Warning
+                        </h2>
+                        <p style={{ color: 'var(--text-primary)', marginBottom: '1.25rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                            You are about to send an outstanding payment warning to <strong>{warnModalCustomer.name}</strong> (ID: <code>{warnModalCustomer.id.split('-')[0]}...</code>).
+                            They currently have <strong>{warnModalCustomer.billing_history?.filter(b => b.status === 'UNPAID' || b.status === 'OVERDUE').length || warnModalCustomer.consecutive_unpaid_months || 0}</strong> unpaid/overdue bill(s).
+                        </p>
+                        
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                Select Severity / Warning Type
+                            </label>
+                            <select 
+                                value={warnType} 
+                                onChange={e => setWarnType(e.target.value)}
+                                style={{ 
+                                    width: '100%', 
+                                    padding: '0.75rem', 
+                                    borderRadius: '8px', 
+                                    border: '1px solid var(--border-default)', 
+                                    background: 'var(--bg-body)', 
+                                    color: 'var(--text-primary)', 
+                                    fontSize: '0.95rem',
+                                    boxSizing: 'border-box'
+                                }}
+                            >
+                                <option value="standard">Standard Warning</option>
+                                <option value="urgent">Urgent Warning</option>
+                                <option value="disconnection">Disconnection Notice (Final Notice)</option>
+                            </select>
+                        </div>
+                        
+                        <div style={{ 
+                            background: 'var(--color-surface-2)', 
+                            border: '1px solid var(--border-default)', 
+                            padding: '1.25rem', 
+                            borderRadius: '8px', 
+                            marginBottom: '1.5rem', 
+                            fontSize: '0.9rem' 
+                        }}>
+                            <div style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                🔍 Live Notification Preview:
+                            </div>
+                            <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                {(() => {
+                                    const unpaidCount = warnModalCustomer.billing_history?.filter(b => b.status === 'UNPAID' || b.status === 'OVERDUE').length || warnModalCustomer.consecutive_unpaid_months || 0;
+                                    if (warnType === 'urgent') {
+                                        return `URGENT: Dear Customer, you have ${unpaidCount} unpaid/overdue water bill(s). Please settle them immediately to avoid remote deactivation of your meter.`;
+                                    } else if (warnType === 'disconnection') {
+                                        return `FINAL NOTICE: Your water meter is scheduled for remote deactivation due to ${unpaidCount} unpaid/overdue bill(s). Please settle them now to prevent service cutoff.`;
+                                    } else {
+                                        return `Dear Customer, you have ${unpaidCount} unpaid/overdue water bill(s). Please settle them as soon as possible to avoid service disruption.`;
+                                    }
+                                })()}
+                            </p>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setWarnModalCustomer(null)}>Cancel</button>
+                            <button 
+                                className="btn btn-primary btn-sm" 
+                                style={{ background: 'var(--color-warning)', border: 'none', color: '#fff', fontWeight: 600 }} 
+                                onClick={() => handleSendWarning(warnModalCustomer.id, warnType)}
+                            >
+                                Dispatch Warning
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Bulk Warning Options Modal ─────────────────────────────── */}
+            {bulkWarnModal && (
+                <div className="modal-overlay" style={{ zIndex: 1001 }}>
+                    <div className="modal-content" style={{ maxWidth: '520px', width: '90%' }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            ✉️ Send Bulk Outstanding Warning
+                        </h2>
+                        <p style={{ color: 'var(--text-primary)', marginBottom: '1.25rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                            You are about to dispatch outstanding billing warnings to <strong>{selectedCustomers.length}</strong> selected customer(s).
+                            Each warning will automatically calculate and display that customer's exact count of unpaid/overdue bills.
+                        </p>
+                        
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                Select Severity / Warning Type
+                            </label>
+                            <select 
+                                value={bulkWarnType} 
+                                onChange={e => setBulkWarnType(e.target.value)}
+                                style={{ 
+                                    width: '100%', 
+                                    padding: '0.75rem', 
+                                    borderRadius: '8px', 
+                                    border: '1px solid var(--border-default)', 
+                                    background: 'var(--bg-body)', 
+                                    color: 'var(--text-primary)', 
+                                    fontSize: '0.95rem',
+                                    boxSizing: 'border-box'
+                                }}
+                            >
+                                <option value="standard">Standard Warning</option>
+                                <option value="urgent">Urgent Warning</option>
+                                <option value="disconnection">Disconnection Notice (Final Notice)</option>
+                            </select>
+                        </div>
+                        
+                        <div style={{ 
+                            background: 'var(--color-surface-2)', 
+                            border: '1px solid var(--border-default)', 
+                            padding: '1.25rem', 
+                            borderRadius: '8px', 
+                            marginBottom: '1.5rem', 
+                            fontSize: '0.9rem' 
+                        }}>
+                            <div style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                🔍 Message Template Preview (Example with 3 unpaid bills):
+                            </div>
+                            <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                {bulkWarnType === 'urgent' && "URGENT: Dear Customer, you have 3 unpaid/overdue water bill(s). Please settle them immediately to avoid remote deactivation of your meter."}
+                                {bulkWarnType === 'disconnection' && "FINAL NOTICE: Your water meter is scheduled for remote deactivation due to 3 unpaid/overdue bill(s). Please settle them now to prevent service cutoff."}
+                                {bulkWarnType === 'standard' && "Dear Customer, you have 3 unpaid/overdue water bill(s). Please settle them as soon as possible to avoid service disruption."}
+                            </p>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setBulkWarnModal(false)}>Cancel</button>
+                            <button 
+                                className="btn btn-primary btn-sm" 
+                                style={{ background: 'var(--color-warning)', border: 'none', color: '#fff', fontWeight: 600 }} 
+                                onClick={() => handleBulkWarn(bulkWarnType)}
+                            >
+                                Dispatch Bulk Warnings
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -50,10 +50,17 @@ class UploadReadingView(APIView):
         except Meter.DoesNotExist:
             return Response({'error': 'Meter not found'}, status=404)
         
+        # Check system active
+        from apps.accounts.models import SystemSetting
+        system_active = SystemSetting.get('billing_system_active', 'true') == 'true'
+        
         # Check permissions: Customers only own meters; Clerks/Admins can upload for anyone.
         user_role = request.user.role.name if request.user.role else ''
         is_staff_or_clerk = request.user.is_staff or user_role in ['ADMIN', 'CLERK', 'TECHNICIAN']
         
+        if not system_active and not is_staff_or_clerk:
+            return Response({'error': 'The water billing system is temporarily deactivated. Meter scanning and bill generation are currently unavailable.'}, status=403)
+            
         if not is_staff_or_clerk:
             if not hasattr(request.user, 'customer') or request.user.customer != meter.customer:
                 return Response({'error': 'Unauthorized'}, status=403)

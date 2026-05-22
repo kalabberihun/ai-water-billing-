@@ -570,3 +570,92 @@ class SystemNotificationMarkReadView(APIView):
             SystemNotification.objects.filter(user=request.user, is_read=False).update(is_read=True)
             
         return Response({'success': True})
+
+
+class SystemControlView(APIView):
+    """
+    Admin endpoint to activate/deactivate the billing system.
+    GET  → returns current system status
+    POST → toggles the system and notifies all customers
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .models import SystemSetting
+        system_active = SystemSetting.get('billing_system_active', 'true')
+        return Response({
+            'system_active': system_active == 'true',
+            'updated_at': SystemSetting.objects.filter(key='billing_system_active').values_list('updated_at', flat=True).first()
+        })
+
+    def post(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN']:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        action = request.data.get('action')  # 'activate' or 'deactivate'
+        if action not in ['activate', 'deactivate']:
+            return Response({'error': 'action must be "activate" or "deactivate"'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import SystemSetting, SystemNotification, Customer
+
+        is_activating = action == 'activate'
+        SystemSetting.set('billing_system_active', 'true' if is_activating else 'false')
+
+        # Send notification to all customers
+        if is_activating:
+            subject = '✅ Water Billing System Activated'
+            msg = 'The water billing system has been activated. You can now scan your water meter and generate bills through the app. Thank you for using our services!'
+        else:
+            subject = '⚠️ Water Billing System Deactivated'
+            msg = 'The water billing system has been temporarily deactivated by the administration. Meter scanning and bill generation are currently unavailable. We will notify you when the system is back online.'
+
+        # Create in-app notifications for all customers
+        customers = Customer.objects.filter(deleted_at__isnull=True).select_related('user')
+        notifications = []
+        customer_emails = []
+        for c in customers:
+            notifications.append(SystemNotification(
+                user=c.user,
+                alert_type='INFO' if is_activating else 'WARNING',
+                message=msg
+            ))
+            if c.user.email:
+                customer_emails.append(c.user.email)
+
+        SystemNotification.objects.bulk_create(notifications)
+
+        # Send bulk email
+        if customer_emails:
+            for email in customer_emails:
+                try:
+                    send_html_email(
+                        subject=subject,
+                        template_name='emails/notification.html',
+                        context={
+                            'name': 'Valued Customer',
+                            'message': msg
+                        },
+                        recipient_list=[email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+
+        # Audit log
+        from .models import AuditLog
+        AuditLog.objects.create(
+            user=request.user,
+            action=f"SYSTEM_{action.upper()}",
+            entity_type="SystemSetting",
+            entity_id="billing_system_active",
+            ip_address=request.META.get('REMOTE_ADDR', '0.0.0.0'),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            metadata={"new_value": 'true' if is_activating else 'false'}
+        )
+
+        return Response({
+            'success': True,
+            'system_active': is_activating,
+            'message': f'System {"activated" if is_activating else "deactivated"} successfully. {len(notifications)} customers notified.'
+        })

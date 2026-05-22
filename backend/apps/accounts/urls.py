@@ -5,7 +5,7 @@ from .views import (
     AdminDisputesView, AdminUserListView, AdminSetRoleView,
     PasswordResetRequestView, PasswordResetConfirmView,
     SystemNotificationListView, SystemNotificationMarkReadView,
-    VerifyEmailView, ResendOTPView
+    VerifyEmailView, ResendOTPView, SystemControlView
 )
 
 urlpatterns = [
@@ -25,6 +25,7 @@ urlpatterns = [
     
     # Admin endpoints
     path('admin/stats', AdminStatsView.as_view(), name='admin-stats'),
+    path('admin/system-control', SystemControlView.as_view(), name='admin-system-control'),
     path('admin/pending-readings', AdminPendingReadingsView.as_view(), name='admin-pending-readings'),
     path('admin/disputes', AdminDisputesView.as_view(), name='admin-disputes'),
     path('admin/users', AdminUserListView.as_view(), name='admin-users'),
