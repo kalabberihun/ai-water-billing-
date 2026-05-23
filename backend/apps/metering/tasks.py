@@ -184,7 +184,7 @@ def process_ocr(self, reading_id):
                     generate_bill.delay(str(reading_id))
                 except Exception:
                     # Fallback if Celery isn't running
-                    generate_bill(None, str(reading_id))
+                    generate_bill.__wrapped__(None, str(reading_id))
             else:
                 reading.status = 'MANUAL_REVIEW'
         else:
