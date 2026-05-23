@@ -209,6 +209,14 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
 ]
 
+# CSRF Trusted Origins (Required for secure admin/session form posts in production)
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
+] + [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 
 # JWT Configuration (RS256)
 JWT_ALGORITHM = 'RS256'

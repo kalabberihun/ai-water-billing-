@@ -29,10 +29,19 @@ if not User.objects.filter(email='admin@example.com').exists():
     print("Superuser 'admin@example.com' with password 'admin123' and ADMIN role created successfully.")
 else:
     user = User.objects.get(email='admin@example.com')
+    updated = False
     if user.role != admin_role:
         user.role = admin_role
+        updated = True
+    if not user.is_staff:
+        user.is_staff = True
+        updated = True
+    if not user.is_superuser:
+        user.is_superuser = True
+        updated = True
+    if updated:
         user.save()
-        print("Updated existing superuser 'admin@example.com' to have ADMIN role.")
+        print("Updated existing superuser 'admin@example.com' with correct ADMIN role, staff status, and superuser privileges.")
     else:
         print("Superuser 'admin@example.com' already exists and is configured correctly.")
 

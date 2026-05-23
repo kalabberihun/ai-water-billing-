@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Bill, Payment, TariffTier, WaterAlert
+from .models import Bill, Payment, TariffTier, WaterAlert, Dispute
 
 @admin.register(TariffTier)
 class TariffTierAdmin(admin.ModelAdmin):
@@ -33,3 +33,12 @@ class WaterAlertAdmin(admin.ModelAdmin):
     search_fields = ('customer__user__email', 'message')
     readonly_fields = ('created_at',)
     list_editable = ('is_resolved',)
+
+@admin.register(Dispute)
+class DisputeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'bill', 'customer', 'status', 'created_at', 'resolved_at')
+    list_filter = ('status', 'created_at', 'resolved_at')
+    search_fields = ('customer__user__email', 'id', 'bill__id')
+    readonly_fields = ('created_at',)
+    list_editable = ('status',)
+    ordering = ('-created_at',)
