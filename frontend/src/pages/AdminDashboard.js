@@ -1767,8 +1767,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '8px' }}>
                                     <span style={{ fontWeight: 500 }}>{item.label}</span>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <a href={`http://localhost:8000/admin/${item.path}/add/`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>+ Add</a>
-                                        <a href={`http://localhost:8000/admin/${item.path}/`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>Manage</a>
+                                        <a href={`${API}/admin/${item.path}/add/`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>+ Add</a>
+                                        <a href={`${API}/admin/${item.path}/`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>Manage</a>
                                     </div>
                                 </div>
                             ))}
@@ -1788,8 +1788,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '8px' }}>
                                     <span style={{ fontWeight: 500 }}>{item.label}</span>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <a href={`http://localhost:8000/admin/${item.path}/add/`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>+ Add</a>
-                                        <a href={`http://localhost:8000/admin/${item.path}/`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>Manage</a>
+                                        <a href={`${API}/admin/${item.path}/add/`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>+ Add</a>
+                                        <a href={`${API}/admin/${item.path}/`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>Manage</a>
                                     </div>
                                 </div>
                             ))}
@@ -1811,8 +1811,8 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '8px' }}>
                                     <span style={{ fontWeight: 500 }}>{item.label}</span>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <a href={`http://localhost:8000/admin/${item.path}/add/`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>+ Add</a>
-                                        <a href={`http://localhost:8000/admin/${item.path}/`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>Manage</a>
+                                        <a href={`${API}/admin/${item.path}/add/`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>+ Add</a>
+                                        <a href={`${API}/admin/${item.path}/`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', minHeight: 'auto' }}>Manage</a>
                                     </div>
                                 </div>
                             ))}
