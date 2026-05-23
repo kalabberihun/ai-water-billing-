@@ -48,7 +48,10 @@ const setupAxiosInterceptors = () => {
                     if (!tokens.refresh) throw new Error('No refresh token');
                     
                     // Call the refresh endpoint (clean axios instance to avoid interceptor loop)
-                    const apiURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+                    const apiURL = process.env.REACT_APP_API_URL || 
+                        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                            ? 'http://localhost:8000' 
+                            : 'https://water-billing-api-k6qs.onrender.com');
                     const res = await axios.post(`${apiURL}/api/auth/refresh`, {
                         refresh: tokens.refresh
                     }, {

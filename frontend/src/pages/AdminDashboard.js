@@ -64,7 +64,10 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
 };
 
 const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'];
-const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API = process.env.REACT_APP_API_URL || 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? 'http://localhost:8000' 
+        : 'https://water-billing-api-k6qs.onrender.com');
 
 const AdminDashboard = ({ section = 'dashboard' }) => {
     const navigate = useNavigate();
