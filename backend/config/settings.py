@@ -28,6 +28,11 @@ for host in raw_hosts:
     if host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(host)
 
+# Automatically append Render's external hostname if deployed on Render
+render_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if render_host and render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_host)
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -184,9 +189,12 @@ REST_FRAMEWORK = {
 }
 
 # CORS
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
+
 raw_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if raw_cors:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in raw_cors.split(',') if origin.strip()]
+    CORS_ALLOW_ALL_ORIGINS = False
 else:
     CORS_ALLOWED_ORIGINS = [
         f"https://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
@@ -194,6 +202,11 @@ else:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+
+# Fallback support for Vercel preview/dynamic URLs if CORS_ALLOW_ALL_ORIGINS is disabled
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+]
 
 
 # JWT Configuration (RS256)
