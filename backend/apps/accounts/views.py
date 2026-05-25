@@ -36,7 +36,7 @@ def _generate_otp():
 def _send_otp_email(user, otp_code):
     """Send the OTP verification email."""
     send_html_email(
-        subject='Verify Your Email - AquaBill AI',
+        subject='Verify Your Email - AI WATER BILLING SYSTEM',
         template_name='emails/otp_verification.html',
         context={
             'user': user,
@@ -84,11 +84,15 @@ class RegisterView(APIView):
             # Create user — inactive until email is verified
             password_hash = make_password(data['password'])
             
+            # Fetch or create default CUSTOMER role
+            customer_role, _ = Role.objects.get_or_create(name='CUSTOMER')
+
             user = User.objects.create(
                 email=data['email'],
                 first_name=data.get('first_name', ''),
                 last_name=data.get('last_name', ''),
                 password=password_hash,
+                role=customer_role,
                 is_active=False,
                 is_email_verified=False,
             )
@@ -392,7 +396,7 @@ class PasswordResetRequestView(APIView):
                 # Send email
                 try:
                     send_html_email(
-                        subject='Password Reset - AquaBill AI',
+                        subject='Password Reset - AI WATER BILLING SYSTEM',
                         template_name='emails/password_reset.html',
                         context={'reset_link': reset_link},
                         recipient_list=[user.email],

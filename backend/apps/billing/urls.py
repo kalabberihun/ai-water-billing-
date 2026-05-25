@@ -5,12 +5,13 @@ from .views import (
     ConsumptionPredictionView,
     ChapaInitializeView, ChapaCallbackView, ChapaVerifyView,
     DisputeListView, DisputeCreateView, AdminDisputeUpdateView,
-    AdminCustomerPaymentsView
+    AdminCustomerPaymentsView, AdminPaymentHistoryView
 )
 from .chatbot import ChatbotView
 
 urlpatterns = [
     path('admin/customer-payments', AdminCustomerPaymentsView.as_view(), name='admin-customer-payments'),
+    path('admin/payment-history', AdminPaymentHistoryView.as_view(), name='admin-payment-history'),
     path('bills', BillListView.as_view(), name='bills'),
     path('bills/<uuid:pk>', BillDetailView.as_view(), name='bill-detail'),
     path('bills/<uuid:bill_id>/pdf', BillPDFView.as_view(), name='bill-pdf'),

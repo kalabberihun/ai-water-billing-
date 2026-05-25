@@ -8,6 +8,7 @@ const Login = () => {
     const successMessage = location.state?.message;
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ const Login = () => {
                 <div className="auth-card">
                     <div className="auth-logo">
                         <div className="auth-logo-icon">💧</div>
-                        <h1 className="auth-title">AquaBill AI</h1>
+                        <h1 className="auth-title">AI WATER BILLING SYSTEM</h1>
                         <p className="auth-subtitle">Sign in to manage your account</p>
                     </div>
 
@@ -60,7 +61,7 @@ const Login = () => {
                                 type="email"
                                 required
                                 className="form-input"
-                                placeholder="you@example.com"
+                                placeholder=""
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 autoComplete="email"
@@ -74,15 +75,40 @@ const Login = () => {
                                     Forgot password?
                                 </Link>
                             </div>
-                            <input
-                                type="password"
-                                required
-                                className="form-input"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                autoComplete="current-password"
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    required
+                                    className="form-input"
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                    style={{ paddingRight: '2.5rem' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.1rem',
+                                        padding: '4px',
+                                        userSelect: 'none',
+                                    }}
+                                >
+                                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                                </button>
+                            </div>
                         </div>
 
                         <button

@@ -11,7 +11,7 @@ from apps.accounts.models import Role
 User = get_user_model()
 
 # Create basic roles
-roles_to_create = ['Admin', 'Clerk', 'Technician']
+roles_to_create = ['Admin', 'Clerk', 'Technician', 'CUSTOMER']
 for role_name in roles_to_create:
     role, created = Role.objects.get_or_create(name=role_name)
     if created:

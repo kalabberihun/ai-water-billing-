@@ -21,7 +21,7 @@ const LandingLayout = ({ children }) => {
                 <div className="landing-nav-inner">
                     <Link to="/" className="landing-logo" style={{ textDecoration: 'none' }}>
                         <div className="landing-logo-icon">💧</div>
-                        <span className="landing-logo-text">AquaBill AI</span>
+                        <span className="landing-logo-text">AI WATER BILLING SYSTEM</span>
                     </Link>
                     <div className="landing-nav-links">
                         <Link to="/features" style={{ color: isActive('/features') ? 'var(--primary-400)' : undefined }}>Features</Link>
@@ -65,7 +65,7 @@ const LandingLayout = ({ children }) => {
                     <div className="landing-footer-brand">
                         <Link to="/" className="landing-logo" style={{ textDecoration: 'none' }}>
                             <div className="landing-logo-icon">💧</div>
-                            <span className="landing-logo-text">AquaBill AI</span>
+                            <span className="landing-logo-text">AI WATER BILLING SYSTEM</span>
                         </Link>
                         <p className="landing-footer-tagline">
                             AI-powered water billing for the modern utility.
@@ -81,7 +81,7 @@ const LandingLayout = ({ children }) => {
                         <div className="landing-footer-col">
                             <h4>Company</h4>
                             <Link to="/about">About Us</Link>
-                            <a href="mailto:Support.aquabillai@gmail.com">Contact</a>
+                             <a href="mailto:Support.aiwaterbillingsystem@gmail.com">Contact</a>
                         </div>
                         <div className="landing-footer-col">
                             <h4>Account</h4>
@@ -92,7 +92,7 @@ const LandingLayout = ({ children }) => {
                     </div>
                 </div>
                 <div className="landing-footer-bottom">
-                    <span>© 2026 AquaBill AI. All rights reserved.</span>
+                     <span>© 2026 AI WATER BILLING SYSTEM. All rights reserved.</span>
                 </div>
             </footer>
         </div>
@@ -385,7 +385,7 @@ const WhyUsPage = () => {
             <section className="landing-section landing-visible">
                 <div className="landing-section-header">
                     <span className="landing-section-badge">Advantages</span>
-                    <h2 className="landing-section-title">Why Utilities Choose AquaBill AI</h2>
+                    <h2 className="landing-section-title">Why Utilities Choose AI WATER BILLING SYSTEM</h2>
                 </div>
                 <div className="landing-features-grid">
                     {[
@@ -454,18 +454,42 @@ const AboutUsPage = () => {
                 {/* Team */}
                 <div className="landing-section-header">
                     <span className="landing-section-badge">The Team</span>
-                    <h2 className="landing-section-title">Meet the People Behind AquaBill AI</h2>
+                    <h2 className="landing-section-title">Meet the People Behind AI WATER BILLING SYSTEM</h2>
                 </div>
                 <div className="landing-features-grid" style={{ marginBottom: '4rem' }}>
                     {[
-                        { icon: '👨‍💻', name: 'Kalab Berihun', role: 'Lead Developer & Founder', desc: 'Full-stack engineer with 1+ years in utility management systems and AI integration.', color: '#3478ff' },
-                        { icon: '👩‍🔬', name: 'Betelhem Tadegegn', role: 'AI/ML Engineer', desc: 'Specialized in computer vision and OCR systems for real-world applications.', color: '#8b5cf6' },
-                        { icon: '👨‍💼', name: 'Mihretab Sleshi', role: 'Backend Engineer', desc: 'Expert in scalable API design, database optimization, and cloud infrastructure.', color: '#10b981' },
-                        { icon: '👨‍💼', name: 'Mesay Tsegaye', role: 'Backend Engineer', desc: 'Expert in scalable API design, database optimization, and cloud infrastructure.', color: '#f59e0b' },
-                        { icon: '👩‍💼', name: 'Mekdes Addis', role: 'UI/UX Designer', desc: 'Passionate about creating intuitive, accessible interfaces that delight users.', color: '#ec4899' },
+                        { image: '/team_kalab.jpg', name: 'Kalab Berihun', role: 'Lead Developer & Founder', desc: 'Full-stack engineer with 1+ years in utility management systems and AI integration.', color: '#3478ff' },
+                        { image: '/team_betelhem.jpg', name: 'Betelhem Tadegegn', role: 'AI/ML Engineer', desc: 'Specialized in computer vision and OCR systems for real-world applications.', color: '#8b5cf6' },
+                        { image: '/team_mhretab.jpg', name: 'Mihretab Sleshi', role: 'Backend Engineer', desc: 'Expert in scalable API design, database optimization, and cloud infrastructure.', color: '#10b981', objectPosition: 'top' },
+                        { image: '/team_mesay.jpg', name: 'Mesay Tsegaye', role: 'Backend Engineer', desc: 'Expert in scalable API design, database optimization, and cloud infrastructure.', color: '#f59e0b', objectPosition: 'top' },
+                        { image: '/team_mekdes.png', name: 'Mekdes Addis', role: 'UI/UX Designer', desc: 'Passionate about creating intuitive, accessible interfaces that delight users.', color: '#ec4899' },
                     ].map((member, i) => (
                         <div key={i} className="landing-feature-card" style={{ '--accent': member.color, textAlign: 'center' }}>
-                            <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>{member.icon}</div>
+                            <div style={{
+                                width: '130px',
+                                height: '130px',
+                                margin: '0 auto 1.25rem',
+                                borderRadius: '50%',
+                                overflow: 'hidden',
+                                border: `3px solid ${member.color}`,
+                                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'var(--bg-secondary)',
+                                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                            }}>
+                                <img 
+                                    src={member.image} 
+                                    alt={member.name}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        objectPosition: member.objectPosition || 'center',
+                                    }}
+                                />
+                            </div>
                             <h3 className="landing-feature-title">{member.name}</h3>
                             <div style={{ color: 'var(--color-accent)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>{member.role}</div>
                             <p className="landing-feature-desc">{member.desc}</p>
@@ -483,10 +507,10 @@ const AboutUsPage = () => {
                 </div>
                 <div className="landing-stats-grid">
                     {[
-                        { icon: '📧', label: 'Email', value: 'Support.aquabillai@gmail.com', href: 'mailto:Support.aquabillai@gmail.com' },
+                        { icon: '📧', label: 'Email', value: 'Support.aiwaterbillingsystem@gmail.com', href: 'mailto:Support.aiwaterbillingsystem@gmail.com' },
                         { icon: '📞', label: 'Phone', value: '+251 993 140 988', href: 'tel:+251993140988' },
-                        { icon: '𝕏', label: 'X (Twitter)', value: '@AquaBillAI', href: 'https://x.com/AquaBillAI' },
-                        { icon: '✈️', label: 'Telegram', value: '@AquaBillAI_Bot', href: 'https://t.me/AquaBillAI_Bot' },
+                        { icon: '𝕏', label: 'X (Twitter)', value: '@AIWaterBilling', href: 'https://x.com/AIWaterBilling' },
+                        { icon: '✈️', label: 'Telegram', value: '@AIWaterBilling_Bot', href: 'https://t.me/AIWaterBilling_Bot' },
                     ].map((contact, i) => (
                         <a
                             key={i}

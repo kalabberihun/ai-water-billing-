@@ -9,7 +9,7 @@ const SupportWidget = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('support'); // 'support' | 'chat'
     const [messages, setMessages] = useState([
-        { role: 'bot', text: "Hi! I'm AquaBill AI Assistant 💧\nAsk me anything about your bills, payments, or water usage!" }
+        { role: 'bot', text: "Hi! I'm AI WATER BILLING SYSTEM Assistant 💧\nAsk me anything about your bills, payments, or water usage!" }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -33,8 +33,8 @@ const SupportWidget = () => {
         {
             icon: '📧',
             label: 'Email Support',
-            desc: 'Support.aquabillai@gmail.com',
-            action: () => window.location.href = 'mailto:Support.aquabillai@gmail.com'
+            desc: 'Support.aiwaterbillingsystem@gmail.com',
+            action: () => window.location.href = 'mailto:Support.aiwaterbillingsystem@gmail.com'
         },
         {
             icon: '📞',
@@ -45,8 +45,8 @@ const SupportWidget = () => {
         {
             icon: '✈️',
             label: 'Telegram',
-            desc: '@AquaBillAI_Bot',
-            action: () => window.open('https://t.me/AquaBillAI_Bot', '_blank')
+            desc: '@AIWaterBilling_Bot',
+            action: () => window.open('https://t.me/AIWaterBilling_Bot', '_blank')
         },
     ];
 

@@ -14,21 +14,71 @@ logger = logging.getLogger(__name__)
 
 GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
+# Single unified prompt — always asks AI to return detected IDs.
+# We do the matching ourselves in Python, never rely on AI judgment.
 OCR_PROMPT = """
 You are an expert AI specialized in reading water meters with high precision.
 
-TASK: Analyze the provided image and extract the main water consumption reading.
+TASK: Analyze the provided image and:
+1. Locate the main mechanical or digital counter display showing cumulative consumption.
+2. Extract the exact 5 digits on the main register, including leading zeros (e.g. "00109").
+3. Search EVERYWHERE on the meter — the face, casing, brass rim, outer edge, engraved text — for ALL serial numbers, IDs, and numeric codes you can find. Return them as a list.
 
 RULES:
-1. Focus ONLY on the mechanical or digital counter display showing cumulative consumption.
-2. Read ALL visible digits on the main register, including leading zeros.
-3. If the meter has a decimal/fractional portion, include it after a decimal point.
-4. IGNORE: serial numbers, barcodes, QR codes, model/brand text.
-5. If the image is too blurry or does not contain a water meter, return confidence 0.
+1. Every meter has exactly 5 digits on the main register. Do NOT skip any leading zeros.
+2. The "detected_ids" list should contain ALL numbers/serials found on the meter body, casing, and rim — NOT the reading digits.
+3. If the image is too blurry, dark, or does not contain a water meter, return confidence 0.
 
-Return ONLY valid JSON:
-{"reading": <number>, "confidence": <float 0-1>}
+Return ONLY a valid JSON object:
+{
+  "digits": "<5-digit string>",
+  "detected_ids": ["<serial1>", "<serial2>", ...],
+  "confidence": <float 0-1>
+}
 """
+
+
+def calculate_reading_value(digits_str):
+    """Convert 5-digit string to reading value using the leading-zero rule."""
+    digits_str = "".join(digits_str.split())
+    if len(digits_str) != 5 or not digits_str.isdigit():
+        raise ValueError(f"Reading must be exactly 5 digits: '{digits_str}'")
+    
+    d1, d2, d3, d4, d5 = digits_str[0], digits_str[1], digits_str[2], digits_str[3], digits_str[4]
+    if d1 == '0' and d2 == '0':
+        whole = int(d3 + d4)
+        decimal = int(d5)
+    else:
+        whole = int(d1 + d2 + d3 + d4)
+        decimal = int(d5)
+    return float(f"{whole}.{decimal}")
+
+
+def check_meter_id_match(expected_id, detected_ids):
+    """
+    Check if the expected meter ID matches any of the detected IDs.
+    Uses case-insensitive substring matching.
+    Returns True if any match is found.
+    """
+    if not expected_id or not detected_ids:
+        return False
+    expected_clean = expected_id.strip().lower()
+    for detected in detected_ids:
+        detected_clean = str(detected).strip().lower()
+        if not detected_clean or detected_clean == 'null':
+            continue
+        # Exact match
+        if expected_clean == detected_clean:
+            return True
+        # Substring match: expected is contained in detected (e.g. expected is "666702191" and detected is "sn-666702191")
+        if len(expected_clean) >= 4 and expected_clean in detected_clean:
+            return True
+        # Substring match: detected is contained in expected (e.g. expected is "MTR-00001" and detected is "00001")
+        # To avoid false positive on single/double digit noise (e.g. "1", "16", "50", "1.5"),
+        # we require the detected ID to have a length of at least 4 characters.
+        if len(detected_clean) >= 4 and detected_clean in expected_clean:
+            return True
+    return False
 
 
 class DemoOCRView(APIView):
@@ -55,6 +105,7 @@ class DemoOCRView(APIView):
         img_bytes = image.read()
         content_type = image.content_type or 'image/jpeg'
 
+        # Bypassed duplicate checks for live demo to allow trying any photo.
         debug_info = []
 
         # Try Gemini first
@@ -77,10 +128,24 @@ class DemoOCRView(APIView):
                 'error': f'AI processing failed. Debug: {" | ".join(debug_info)}'
             })
 
+        digits = result['digits']
+        try:
+            reading_value = calculate_reading_value(digits)
+        except ValueError as e:
+            return Response({
+                'success': False,
+                'error': f'AI reading failed: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve detected casing serial numbers
+        detected_ids = result.get('detected_ids') or []
+
         return Response({
             'success': True,
-            'reading': result['reading'],
+            'reading': reading_value,
             'confidence': result['confidence'],
+            'digits_detected': digits,
+            'detected_ids': detected_ids,
             'image_size': f'{width}x{height}',
             'model': model_used,
         })
@@ -94,7 +159,7 @@ class DemoOCRView(APIView):
 
             client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-            for model_name in ['gemini-2.0-flash', 'gemini-2.0-flash-lite']:
+            for model_name in ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']:
                 try:
                     response = client.models.generate_content(
                         model=model_name,
@@ -131,6 +196,7 @@ class DemoOCRView(APIView):
 
         try:
             b64_image = base64.b64encode(img_bytes).decode('utf-8')
+            system_msg = 'You are a water meter OCR reader. Respond with ONLY JSON: {"digits": "<5-digit string>", "detected_ids": ["<serial1>", ...], "confidence": <float 0-1>}'
 
             res = http_requests.post(
                 GROQ_CHAT_URL,
@@ -143,7 +209,7 @@ class DemoOCRView(APIView):
                     'messages': [
                         {
                             'role': 'system',
-                            'content': 'You are a water meter OCR reader. You MUST respond with ONLY a JSON object, no explanation, no markdown, no text before or after. Format: {"reading": <number>, "confidence": <float 0-1>}'
+                            'content': system_msg
                         },
                         {
                             'role': 'user',
@@ -156,12 +222,13 @@ class DemoOCRView(APIView):
                                 },
                                 {
                                     'type': 'text',
-                                    'text': 'Read the water meter in this image. Return ONLY JSON: {"reading": <number>, "confidence": <float 0-1>}. NO other text.'
+                                    'text': OCR_PROMPT
                                 }
                             ]
                         }
                     ],
-                    'max_tokens': 100,
+                    'response_format': {'type': 'json_object'},
+                    'max_tokens': 200,
                     'temperature': 0.0,
                 },
                 timeout=45,
@@ -182,51 +249,70 @@ class DemoOCRView(APIView):
             return None, None, str(e)[:150]
 
     def _parse_response(self, raw_text):
-        """Parse AI response into reading/confidence dict."""
+        """Parse AI response into digits/detected_ids/confidence dict."""
         import re
         try:
             text = raw_text.strip()
+            data = None
+            
             # Try direct JSON parse first
             try:
-                result = json.loads(text)
-                if 'reading' in result:
-                    return {'reading': result['reading'], 'confidence': result.get('confidence', 0)}
+                data = json.loads(text)
             except json.JSONDecodeError:
                 pass
 
             # Try extracting from markdown fences
-            if '```' in text:
+            if data is None and '```' in text:
                 code_block = text.split('```')[1]
                 if code_block.startswith('json'):
                     code_block = code_block[4:]
                 code_block = code_block.strip()
                 try:
-                    result = json.loads(code_block)
-                    if 'reading' in result:
-                        return {'reading': result['reading'], 'confidence': result.get('confidence', 0)}
+                    data = json.loads(code_block)
                 except json.JSONDecodeError:
                     pass
 
-            # Try regex extraction from verbose text
-            json_match = re.search(r'\{[^{}]*"reading"\s*:\s*[\d.]+[^{}]*\}', text)
-            if json_match:
-                try:
-                    result = json.loads(json_match.group())
-                    return {'reading': result['reading'], 'confidence': result.get('confidence', 0)}
-                except json.JSONDecodeError:
-                    pass
-
-            # Last resort: extract numbers with regex
-            reading_match = re.search(r'"reading"\s*:\s*([\d.]+)', text)
-            conf_match = re.search(r'"confidence"\s*:\s*([\d.]+)', text)
-            if reading_match:
+            # Try regex extraction
+            if data is None:
+                json_match = re.search(r'\{.*\}', text, re.DOTALL)
+                if json_match:
+                    try:
+                        data = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        pass
+            
+            if data and 'digits' in data:
+                detected_ids = data.get('detected_ids', [])
+                # Normalize: if AI returned a single string instead of list
+                if isinstance(detected_ids, str):
+                    detected_ids = [detected_ids] if detected_ids else []
+                # Also accept legacy 'meter_id_detected' field
+                legacy_id = data.get('meter_id_detected')
+                if legacy_id and legacy_id != 'null' and str(legacy_id) not in [str(d) for d in detected_ids]:
+                    detected_ids.append(str(legacy_id))
+                    
                 return {
-                    'reading': float(reading_match.group(1)),
-                    'confidence': float(conf_match.group(1)) if conf_match else 0.5,
+                    'digits': str(data['digits']),
+                    'detected_ids': [str(d) for d in detected_ids if d],
+                    'confidence': float(data.get('confidence', 0.5))
                 }
-
-            logger.warning(f"No reading found in: {text[:200]}")
+                
+            # Fallback regex search for digits
+            digits_match = re.search(r'"digits"\s*:\s*"([0-9]{5})"', text)
+            if not digits_match:
+                digits_match = re.search(r'\b([0-9]{5})\b', text)
+                
+            if digits_match:
+                digits_val = digits_match.group(1)
+                conf_match = re.search(r'"confidence"\s*:\s*([\d.]+)', text)
+                return {
+                    'digits': digits_val,
+                    'detected_ids': [],
+                    'confidence': float(conf_match.group(1)) if conf_match else 0.5
+                }
+                
+            logger.warning(f"No valid digits found in: {text[:200]}")
             return None
-        except Exception:
-            logger.warning(f"Failed to parse OCR response: {raw_text[:200]}")
+        except Exception as e:
+            logger.warning(f"Failed to parse OCR response: {raw_text[:200]}, err: {e}")
             return None

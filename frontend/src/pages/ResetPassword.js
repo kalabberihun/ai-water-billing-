@@ -11,6 +11,8 @@ const ResetPassword = () => {
         password: '',
         confirmPassword: ''
     });
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [status, setStatus] = useState('idle'); // idle, loading, success, error
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -128,32 +130,80 @@ const ResetPassword = () => {
 
                         <div className="form-group">
                             <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>New Password</label>
-                            <input
-                                type="password"
-                                className="form-input"
-                                value={formData.password}
-                                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                                required
-                                minLength="8"
-                                placeholder="••••••••"
-                                autoComplete="new-password"
-                                style={{ padding: '12px 16px' }}
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="form-input"
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    required
+                                    minLength="8"
+                                    placeholder="••••••••"
+                                    autoComplete="new-password"
+                                    style={{ padding: '12px 16px', paddingRight: '2.5rem' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.1rem',
+                                        padding: '4px',
+                                        userSelect: 'none',
+                                    }}
+                                >
+                                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="form-group">
                             <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Confirm New Password</label>
-                            <input
-                                type="password"
-                                className="form-input"
-                                value={formData.confirmPassword}
-                                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                                required
-                                minLength="8"
-                                placeholder="••••••••"
-                                autoComplete="new-password"
-                                style={{ padding: '12px 16px' }}
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    className="form-input"
+                                    value={formData.confirmPassword}
+                                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                    required
+                                    minLength="8"
+                                    placeholder="••••••••"
+                                    autoComplete="new-password"
+                                    style={{ padding: '12px 16px', paddingRight: '2.5rem' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.1rem',
+                                        padding: '4px',
+                                        userSelect: 'none',
+                                    }}
+                                >
+                                    {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                                </button>
+                            </div>
                         </div>
 
                         <button 

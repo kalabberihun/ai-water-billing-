@@ -62,7 +62,7 @@ const Sidebar = () => {
             <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-logo">💧</div>
-                    <span className="sidebar-brand">AquaBill AI</span>
+                    <span className="sidebar-brand">AI WATER BILLING SYSTEM</span>
                 </div>
                 <nav className="sidebar-nav">
                     <span className="nav-section-title">Main Menu</span>

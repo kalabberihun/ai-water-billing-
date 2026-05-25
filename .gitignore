@@ -28,3 +28,11 @@ out/
 # IDE files
 .vscode/
 .idea/
+
+# Local database dumps and cache
+dump.rdb
+backend/celerybeat-schedule.dat
+
+# Media files and collected static files
+backend/media/
+backend/staticfiles/

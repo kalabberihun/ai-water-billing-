@@ -991,3 +991,80 @@ class AdminCustomerPaymentsView(APIView):
 
         else:
             return Response({'error': 'Invalid action'}, status=400)
+
+
+class AdminPaymentHistoryView(APIView):
+    """
+    Returns all payment records across all customers for the admin payment history sidebar.
+    Supports search and status filtering via query params.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_role = request.user.role.name.upper() if request.user.role else ''
+        if not request.user.is_staff and user_role not in ['ADMIN', 'CLERK']:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Query params for filtering
+        search = request.query_params.get('search', '').strip()
+        status_filter = request.query_params.get('status', '').strip()
+        method_filter = request.query_params.get('method', '').strip()
+
+        payments_qs = Payment.objects.select_related(
+            'bill__customer__user'
+        ).order_by('-created_at')
+
+        if status_filter:
+            payments_qs = payments_qs.filter(status=status_filter.upper())
+
+        if method_filter:
+            payments_qs = payments_qs.filter(payment_method__icontains=method_filter)
+
+        if search:
+            from django.db.models import Q
+            payments_qs = payments_qs.filter(
+                Q(bill__customer__user__first_name__icontains=search) |
+                Q(bill__customer__user__last_name__icontains=search) |
+                Q(bill__customer__user__email__icontains=search) |
+                Q(transaction_ref__icontains=search)
+            )
+
+        # Limit to last 200 records for performance
+        payments_qs = payments_qs[:200]
+
+        results = []
+        for p in payments_qs:
+            customer = p.bill.customer if p.bill else None
+            user = customer.user if customer else None
+            results.append({
+                'id': str(p.id),
+                'customer_name': f"{user.first_name} {user.last_name}".strip() if user else 'Unknown',
+                'customer_email': user.email if user else '',
+                'amount': float(p.amount),
+                'transaction_ref': p.transaction_ref or '',
+                'payment_method': p.payment_method,
+                'status': p.status,
+                'paid_at': p.paid_at.strftime('%Y-%m-%d %H:%M') if p.paid_at else None,
+                'created_at': p.created_at.strftime('%Y-%m-%d %H:%M'),
+                'bill_id': str(p.bill.id) if p.bill else None,
+                'bill_period': p.bill.created_at.strftime('%B %Y') if p.bill else '',
+            })
+
+        # Summary stats
+        from django.db.models import Count
+        total_completed = Payment.objects.filter(status='COMPLETED').count()
+        total_pending = Payment.objects.filter(status='PENDING').count()
+        total_failed = Payment.objects.filter(status='FAILED').count()
+        total_amount = Payment.objects.filter(status='COMPLETED').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+
+        return Response({
+            'payments': results,
+            'summary': {
+                'total_completed': total_completed,
+                'total_pending': total_pending,
+                'total_failed': total_failed,
+                'total_amount': f"{total_amount:,.2f}",
+            }
+        })

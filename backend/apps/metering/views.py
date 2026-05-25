@@ -83,6 +83,19 @@ class UploadReadingView(APIView):
         # Reset file pointer after reading with PIL
         image.seek(0)
         
+        # Compute SHA-256 hash of the image to check for reuse/duplicates
+        import hashlib
+        hasher = hashlib.sha256()
+        for chunk in image.chunks():
+            hasher.update(chunk)
+        image_hash = hasher.hexdigest()
+        
+        # Reject only if the photo has already been submitted and resulted in a generated bill
+        if MeterReading.objects.filter(image_hash=image_hash, bill__isnull=False).exists():
+            return Response({
+                'error': 'This photo has already been submitted and used to generate a bill. Please submit a new one.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         file_path = f"meter_readings/{meter.id}/{uuid.uuid4()}_{image.name}"
         
         # Simulate local storage
@@ -93,6 +106,7 @@ class UploadReadingView(APIView):
         reading = MeterReading.objects.create(
             meter=meter,
             image_url=image_url,
+            image_hash=image_hash,
             status='PENDING'
         )
         
@@ -176,7 +190,7 @@ class VerifyReadingView(APIView):
         except Exception:
             # Fallback: call task function directly (bypasses celery)
             try:
-                generate_bill.__wrapped__(None, str(reading.id))
+                generate_bill(str(reading.id))
             except Exception as e:
                 print(f"Bill generation failed: {e}")
         
@@ -466,7 +480,7 @@ class CustomerLeakageReportView(APIView):
         
         try:
             send_html_email(
-                subject='Leakage Report Received - AquaBill AI',
+                subject='Leakage Report Received - AI WATER BILLING SYSTEM',
                 template_name='emails/notification.html',
                 context={
                     'name': request.user.first_name or 'Customer',
@@ -768,7 +782,7 @@ class ClerkSubmitFieldTaskView(APIView):
             generate_bill.apply_async(args=[str(reading.id)])
         except Exception:
             try:
-                generate_bill.__wrapped__(None, str(reading.id))
+                generate_bill(str(reading.id))
             except Exception as e:
                 print(f"Bill generation failed: {e}")
                 

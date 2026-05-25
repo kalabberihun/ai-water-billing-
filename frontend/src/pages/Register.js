@@ -17,6 +17,7 @@ const Register = () => {
         city: '',
         customer_class: 'RESIDENT'
     });
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -64,8 +65,8 @@ const Register = () => {
                 <div className="auth-card" style={{ maxWidth: 520 }}>
                     <div className="auth-logo">
                         <div className="auth-logo-icon">💧</div>
-                        <h1 className="auth-title">AquaBill AI</h1>
-                        <p className="auth-subtitle">Join the smart AquaBill AI platform</p>
+                        <h1 className="auth-title">AI WATER BILLING SYSTEM</h1>
+                        <p className="auth-subtitle">Join the smart AI WATER BILLING SYSTEM platform</p>
                     </div>
 
                     {error && (
@@ -83,7 +84,7 @@ const Register = () => {
                                     type="text"
                                     required
                                     className="form-input"
-                                    placeholder="John"
+                                    placeholder=""
                                     value={formData.first_name}
                                     onChange={handleChange('first_name')}
                                 />
@@ -94,7 +95,7 @@ const Register = () => {
                                     type="text"
                                     required
                                     className="form-input"
-                                    placeholder="Doe"
+                                    placeholder=""
                                     value={formData.last_name}
                                     onChange={handleChange('last_name')}
                                 />
@@ -107,7 +108,7 @@ const Register = () => {
                                 type="email"
                                 required
                                 className="form-input"
-                                placeholder="you@example.com"
+                                placeholder=""
                                 value={formData.email}
                                 onChange={handleChange('email')}
                             />
@@ -115,14 +116,39 @@ const Register = () => {
 
                         <div className="form-group">
                             <label className="form-label">Password</label>
-                            <input
-                                type="password"
-                                required
-                                className="form-input"
-                                placeholder="Minimum 8 characters"
-                                value={formData.password}
-                                onChange={handleChange('password')}
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    required
+                                    className="form-input"
+                                    placeholder="Minimum 8 characters"
+                                    value={formData.password}
+                                    onChange={handleChange('password')}
+                                    style={{ paddingRight: '2.5rem' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.1rem',
+                                        padding: '4px',
+                                        userSelect: 'none',
+                                    }}
+                                >
+                                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="form-row">
@@ -142,7 +168,7 @@ const Register = () => {
                                 <input
                                     type="tel"
                                     className="form-input"
-                                    placeholder="+254..."
+                                    placeholder=""
                                     value={formData.phone}
                                     onChange={handleChange('phone')}
                                 />

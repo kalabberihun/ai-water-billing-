@@ -86,7 +86,7 @@ class ExportBillingDataView(QueryTokenMixin, APIView):
 
         # Title row
         ws.merge_cells('A1:H1')
-        title_cell = ws.cell(row=1, column=1, value=f'AquaBill AI — Billing Report ({datetime.now().strftime("%Y-%m-%d")})')
+        title_cell = ws.cell(row=1, column=1, value=f'AI WATER BILLING SYSTEM — Billing Report ({datetime.now().strftime("%Y-%m-%d")})')
         title_cell.font = Font(name='Calibri', bold=True, size=14, color='1E3A8A')
         title_cell.alignment = Alignment(horizontal='center')
 
@@ -117,7 +117,7 @@ class ExportBillingDataView(QueryTokenMixin, APIView):
             elif bill.status == 'UNPAID':
                 status_cell.font = Font(color='D97706', bold=True)
 
-        filename = f'AquaBill_Bills_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+        filename = f'AI_Water_Billing_System_Bills_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
         return make_excel_response(wb, filename)
 
 
@@ -138,7 +138,7 @@ class ExportCustomerListView(QueryTokenMixin, APIView):
         ws.title = 'Customers'
 
         ws.merge_cells('A1:G1')
-        title_cell = ws.cell(row=1, column=1, value=f'AquaBill AI — Customer List ({datetime.now().strftime("%Y-%m-%d")})')
+        title_cell = ws.cell(row=1, column=1, value=f'AI WATER BILLING SYSTEM — Customer List ({datetime.now().strftime("%Y-%m-%d")})')
         title_cell.font = Font(name='Calibri', bold=True, size=14, color='1E3A8A')
         title_cell.alignment = Alignment(horizontal='center')
 
@@ -158,7 +158,7 @@ class ExportCustomerListView(QueryTokenMixin, APIView):
             ws.cell(row=idx, column=6, value=cust.user.created_at.strftime('%Y-%m-%d') if cust.user else 'N/A')
             ws.cell(row=idx, column=7, value=meter_count)
 
-        filename = f'AquaBill_Customers_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+        filename = f'AI_Water_Billing_System_Customers_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
         return make_excel_response(wb, filename)
 
 
@@ -179,7 +179,7 @@ class ExportAnomalyReportView(QueryTokenMixin, APIView):
         ws.title = 'Anomaly Reports'
 
         ws.merge_cells('A1:F1')
-        title_cell = ws.cell(row=1, column=1, value=f'AquaBill AI — Anomaly Reports ({datetime.now().strftime("%Y-%m-%d")})')
+        title_cell = ws.cell(row=1, column=1, value=f'AI WATER BILLING SYSTEM — Anomaly Reports ({datetime.now().strftime("%Y-%m-%d")})')
         title_cell.font = Font(name='Calibri', bold=True, size=14, color='1E3A8A')
         title_cell.alignment = Alignment(horizontal='center')
 
@@ -201,5 +201,5 @@ class ExportAnomalyReportView(QueryTokenMixin, APIView):
             if not alert.is_resolved:
                 resolved_cell.font = Font(color='DC2626', bold=True)
 
-        filename = f'AquaBill_Anomalies_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+        filename = f'AI_Water_Billing_System_Anomalies_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
         return make_excel_response(wb, filename)

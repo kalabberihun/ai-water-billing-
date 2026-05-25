@@ -123,7 +123,7 @@ const DemoOCR = () => {
                 <div className="landing-nav-inner">
                     <Link to="/" className="landing-logo" style={{ textDecoration: 'none' }}>
                         <div className="landing-logo-icon">💧</div>
-                        <span className="landing-logo-text">AquaBill AI</span>
+                        <span className="landing-logo-text">AI WATER BILLING SYSTEM</span>
                     </Link>
                     <div className="landing-nav-links">
                         <Link to="/features">Features</Link>
@@ -178,6 +178,8 @@ const DemoOCR = () => {
                             onChange={handleImageChange}
                             style={{ display: 'none' }}
                         />
+
+
 
                         <div className="demo-ocr-actions">
                             {image && !processing && !result && (
@@ -240,6 +242,14 @@ const DemoOCR = () => {
                                         />
                                     </div>
                                 </div>
+                                <div className="demo-ocr-result-meta" style={{ marginTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1rem' }}>
+                                    <span>Digits Detected: <strong>{result.digits_detected}</strong></span>
+                                </div>
+                                {result.detected_ids && result.detected_ids.length > 0 && (
+                                    <div className="demo-ocr-result-meta" style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>
+                                        <span>Detected Serials: <strong>{result.detected_ids.join(', ')}</strong></span>
+                                    </div>
+                                )}
                                 <div className="demo-ocr-result-meta">
                                     <span>Model: {result.model}</span>
                                     <span>Image: {result.image_size}</span>

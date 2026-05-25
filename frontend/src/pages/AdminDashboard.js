@@ -142,6 +142,20 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     const [systemActive, setSystemActive] = useState(true);
     const [systemControlLoading, setSystemControlLoading] = useState(false);
 
+    // Global Payment History Sidebar state
+    const [showHistorySidebar, setShowHistorySidebar] = useState(false);
+    const [historyPayments, setHistoryPayments] = useState([]);
+    const [historySummary, setHistorySummary] = useState({
+        total_completed: 0,
+        total_pending: 0,
+        total_failed: 0,
+        total_amount: '0.00'
+    });
+    const [historySearch, setHistorySearch] = useState('');
+    const [historyStatusFilter, setHistoryStatusFilter] = useState('');
+    const [historyMethodFilter, setHistoryMethodFilter] = useState('');
+    const [historyLoading, setHistoryLoading] = useState(false);
+
     const getConfig = useCallback(() => {
         const tokenObj = JSON.parse(localStorage.getItem('tokens'));
         return { headers: { Authorization: `Bearer ${tokenObj?.access}` } };
@@ -179,6 +193,38 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    const fetchPaymentHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        try {
+            const params = {};
+            if (historySearch) params.search = historySearch;
+            if (historyStatusFilter) params.status = historyStatusFilter;
+            if (historyMethodFilter) params.method = historyMethodFilter;
+
+            const res = await axios.get(`${API}/api/billing/admin/payment-history`, {
+                ...getConfig(),
+                params
+            });
+            setHistoryPayments(res.data.payments || []);
+            setHistorySummary(res.data.summary || {
+                total_completed: 0,
+                total_pending: 0,
+                total_failed: 0,
+                total_amount: '0.00'
+            });
+        } catch (error) {
+            console.error('Error fetching global payment history:', error);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, [getConfig, historySearch, historyStatusFilter, historyMethodFilter]);
+
+    useEffect(() => {
+        if (showHistorySidebar) {
+            fetchPaymentHistory();
+        }
+    }, [showHistorySidebar, fetchPaymentHistory]);
 
     // ── Reading review handlers ───────────────────────────────────────────────
     const openReview = (reading) => {
@@ -987,6 +1033,24 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 style={{ padding: '0.5rem 1rem' }}
                             >
                                 Clear
+                            </button>
+
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => setShowHistorySidebar(true)}
+                                style={{
+                                    padding: '0.5rem 1.25rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    fontWeight: 600,
+                                    background: 'linear-gradient(135deg, var(--color-primary) 0%, #4f46e5 100%)',
+                                    border: 'none',
+                                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                                    transition: 'all 0.2s ease',
+                                }}
+                            >
+                                📜 View Payment History Log
                             </button>
                         </div>
                     </div>
@@ -2381,6 +2445,304 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ── Global Payment History Sidebar Drawer ─────────────────── */}
+            <div 
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    right: showHistorySidebar ? 0 : '-500px',
+                    width: '460px',
+                    maxWidth: '90vw',
+                    height: '100vh',
+                    background: 'var(--bg-secondary)',
+                    borderLeft: '1px solid var(--border-default)',
+                    boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.25)',
+                    zIndex: 1050,
+                    transition: 'right 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxSizing: 'border-box',
+                }}
+            >
+                {/* Header */}
+                <div style={{
+                    padding: '1.5rem',
+                    borderBottom: '1px solid var(--border-default)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'var(--color-surface-2)',
+                }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            📜 Payment History Log
+                        </h2>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>All customer payment records</span>
+                    </div>
+                    <button 
+                        onClick={() => setShowHistorySidebar(false)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            fontSize: '1.5rem',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        &times;
+                    </button>
+                </div>
+
+                {/* KPI stats inside sidebar */}
+                <div style={{
+                    padding: '1rem 1.5rem',
+                    background: 'var(--bg-body)',
+                    borderBottom: '1px solid var(--border-default)',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '0.75rem'
+                }}>
+                    <div style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '8px',
+                        padding: '0.5rem 0.75rem',
+                    }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Total Completed</div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#10b981' }}>ETB {historySummary.total_amount}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{historySummary.total_completed} transactions</div>
+                    </div>
+                    <div style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '8px',
+                        padding: '0.5rem 0.75rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                    }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Pending:</span>
+                            <span style={{ fontWeight: 600, color: '#f59e0b' }}>{historySummary.total_pending}</span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                            <span>Failed:</span>
+                            <span style={{ fontWeight: 600, color: '#ef4444' }}>{historySummary.total_failed}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sidebar Filter Panel */}
+                <div style={{
+                    padding: '1rem 1.5rem',
+                    borderBottom: '1px solid var(--border-default)',
+                    background: 'var(--color-surface-2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                }}>
+                    <input 
+                        type="text" 
+                        placeholder="Search by customer, trans ref..."
+                        value={historySearch}
+                        onChange={e => setHistorySearch(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-default)',
+                            background: 'var(--bg-body)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box'
+                        }}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <select
+                            value={historyStatusFilter}
+                            onChange={e => setHistoryStatusFilter(e.target.value)}
+                            style={{
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-default)',
+                                background: 'var(--bg-body)',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.8rem',
+                                boxSizing: 'border-box'
+                            }}
+                        >
+                            <option value="">-- All Statuses --</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="PENDING">Pending</option>
+                            <option value="FAILED">Failed</option>
+                        </select>
+                        <select
+                            value={historyMethodFilter}
+                            onChange={e => setHistoryMethodFilter(e.target.value)}
+                            style={{
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-default)',
+                                background: 'var(--bg-body)',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.8rem',
+                                boxSizing: 'border-box'
+                            }}
+                        >
+                            <option value="">-- All Methods --</option>
+                            <option value="MPESA">M-Pesa</option>
+                            <option value="CHAPA">Chapa</option>
+                            <option value="CASH">Cash</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* List Content */}
+                <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    padding: '1.25rem 1.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    background: 'var(--bg-body)'
+                }}>
+                    {historyLoading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '150px', color: 'var(--text-secondary)' }}>
+                            <div style={{ border: '3px solid var(--border-default)', borderTop: '3px solid var(--color-primary)', borderRadius: '50%', width: '24px', height: '24px', animation: 'spin 1s linear infinite', marginBottom: '1rem' }} />
+                            <span>Fetching transactions...</span>
+                        </div>
+                    ) : historyPayments.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-secondary)' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📭</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>No payments found</div>
+                            <span style={{ fontSize: '0.8rem' }}>Try clearing filters or search query</span>
+                        </div>
+                    ) : (
+                        historyPayments.map(p => (
+                            <div 
+                                key={p.id}
+                                style={{
+                                    background: 'var(--bg-secondary)',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '10px',
+                                    padding: '0.85rem 1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.4rem',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                                            {p.customer_name}
+                                        </div>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                            {p.customer_email}
+                                        </span>
+                                    </div>
+                                    <span className={`badge ${getPaymentBadge(p.status)}`} style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: 700,
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        {p.status}
+                                    </span>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                                    <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        💳 {p.payment_method}
+                                        {p.transaction_ref && <code style={{ fontSize: '0.75rem', background: 'var(--bg-body)', padding: '1px 4px', borderRadius: '4px' }}>({p.transaction_ref})</code>}
+                                    </span>
+                                    <strong style={{ color: p.status === 'COMPLETED' ? '#10b981' : 'var(--text-primary)' }}>
+                                        ETB {p.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </strong>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    <span>📅 {p.paid_at || p.created_at}</span>
+                                    {p.bill_period && <span style={{ fontStyle: 'italic' }}>Bill: {p.bill_period}</span>}
+                                </div>
+
+                                {p.bill_id && (
+                                    <button 
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(`${API}/api/billing/bills/${p.bill_id}/pdf`, '_blank');
+                                        }}
+                                        style={{
+                                            marginTop: '0.35rem',
+                                            padding: '0.2rem 0.5rem',
+                                            fontSize: '0.7rem',
+                                            minHeight: 'auto',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            alignSelf: 'flex-start'
+                                        }}
+                                    >
+                                        📄 View PDF Bill
+                                    </button>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                    padding: '1rem 1.5rem',
+                    borderTop: '1px solid var(--border-default)',
+                    background: 'var(--color-surface-2)',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                }}>
+                    <button 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                            setHistorySearch('');
+                            setHistoryStatusFilter('');
+                            setHistoryMethodFilter('');
+                        }}
+                        style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+
+            {/* Background Backdrop overlay when sidebar is open */}
+            {showHistorySidebar && (
+                <div 
+                    onClick={() => setShowHistorySidebar(false)}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        backdropFilter: 'blur(3px)',
+                        zIndex: 1040,
+                        transition: 'opacity 0.25s ease'
+                    }}
+                />
             )}
 
             <main className="main-content">

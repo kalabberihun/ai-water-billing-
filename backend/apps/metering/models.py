@@ -37,6 +37,7 @@ class MeterReading(models.Model):
     meter = models.ForeignKey(Meter, on_delete=models.CASCADE, related_name='readings')
     reading_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     image_url = models.CharField(max_length=500, blank=True)
+    image_hash = models.CharField(max_length=64, blank=True, null=True, db_index=True)
     ocr_confidence = models.FloatField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     submitted_at = models.DateTimeField(auto_now_add=True)

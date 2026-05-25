@@ -28,9 +28,9 @@ class ChatbotView(APIView):
 
         # Build the prompt
         system_prompt = (
-            "You are AquaBill AI Assistant, a friendly and highly capable support agent for AquaBill AI — "
+            "You are AI WATER BILLING SYSTEM Assistant, a friendly and highly capable support agent for AI WATER BILLING SYSTEM — "
             "an advanced, AI-powered water billing and metering platform in Ethiopia.\n\n"
-            "HOW AQUABILL AI WORKS:\n"
+            "HOW AI WATER BILLING SYSTEM WORKS:\n"
             "- We use AI Vision (OCR) to automatically read water meters from uploaded photos, eliminating manual entry errors.\n"
             "- We use Machine Learning to detect water leaks and unusual consumption spikes early.\n"
             "- We provide a seamless digital portal for customers to view bills, make mobile payments (like Chapa/Telebirr), and track usage.\n\n"
@@ -55,7 +55,7 @@ class ChatbotView(APIView):
         if ai_response is None:
             ai_response = (
                 "I'm currently experiencing high demand. "
-                "Please try again in about a minute, or contact support at Support.aquabillai@gmail.com. ⏳"
+                "Please try again in about a minute, or contact support at Support.aiwaterbillingsystem@gmail.com. ⏳"
             )
 
         return Response({'response': ai_response})
