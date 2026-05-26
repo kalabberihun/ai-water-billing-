@@ -2682,9 +2682,22 @@ const AdminDashboard = ({ section = 'dashboard' }) => {
                                 {p.bill_id && (
                                     <button 
                                         className="btn btn-secondary btn-sm"
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                             e.stopPropagation();
-                                            window.open(`${API}/api/billing/bills/${p.bill_id}/pdf`, '_blank');
+                                            try {
+                                                const tokenObj = JSON.parse(localStorage.getItem('tokens'));
+                                                const config = {
+                                                    headers: { Authorization: `Bearer ${tokenObj?.access}` },
+                                                    responseType: 'blob'
+                                                };
+                                                const res = await axios.get(`${API}/api/billing/bills/${p.bill_id}/pdf`, config);
+                                                const file = new Blob([res.data], { type: 'application/pdf' });
+                                                const fileURL = URL.createObjectURL(file);
+                                                window.open(fileURL, '_blank');
+                                            } catch (err) {
+                                                console.error('Failed to view PDF bill:', err);
+                                                alert('Failed to load PDF bill. Please check your credentials.');
+                                            }
                                         }}
                                         style={{
                                             marginTop: '0.35rem',
