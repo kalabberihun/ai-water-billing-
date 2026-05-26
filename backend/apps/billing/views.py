@@ -1068,3 +1068,58 @@ class AdminPaymentHistoryView(APIView):
                 'total_amount': f"{total_amount:,.2f}",
             }
         })
+
+
+class CustomerPaymentHistoryView(APIView):
+    """Returns the authenticated customer's full payment history."""
+
+    def get(self, request):
+        if not hasattr(request.user, 'customer'):
+            return Response(
+                {'error': 'No customer profile found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        customer = request.user.customer
+        payments = (
+            Payment.objects
+            .filter(bill__customer=customer)
+            .select_related('bill')
+            .order_by('-created_at')
+        )
+
+        results = []
+        for p in payments:
+            results.append({
+                'id': str(p.id),
+                'amount': float(p.amount),
+                'transaction_ref': p.transaction_ref or '',
+                'payment_method': p.payment_method,
+                'status': p.status,
+                'paid_at': p.paid_at.strftime('%Y-%m-%d %H:%M') if p.paid_at else None,
+                'created_at': p.created_at.strftime('%Y-%m-%d %H:%M'),
+                'bill_id': str(p.bill.id) if p.bill else None,
+                'bill_period': p.bill.created_at.strftime('%B %Y') if p.bill else '',
+                'bill_amount': float(p.bill.total_amount) if p.bill else 0,
+                'consumption': float(p.bill.consumption) if p.bill else 0,
+                'bill_status': p.bill.status if p.bill else '',
+                'due_date': p.bill.due_date.strftime('%Y-%m-%d') if p.bill and p.bill.due_date else None,
+            })
+
+        # Customer-specific summary
+        completed_payments = payments.filter(status='COMPLETED')
+        total_paid = completed_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        total_completed = completed_payments.count()
+        total_pending = payments.filter(status='PENDING').count()
+        total_failed = payments.filter(status='FAILED').count()
+
+        return Response({
+            'payments': results,
+            'summary': {
+                'total_paid': f"{total_paid:,.2f}",
+                'total_completed': total_completed,
+                'total_pending': total_pending,
+                'total_failed': total_failed,
+                'total_transactions': payments.count(),
+            }
+        })

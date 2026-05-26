@@ -41,6 +41,7 @@ const Sidebar = () => {
             { path: '/dashboard', label: 'Dashboard', icon: '📊' },
             { path: '/readings', label: 'Meter Readings', icon: '🔍' },
             { path: '/bills', label: 'Bills & Payments', icon: '💳' },
+            { path: '/payment-history', label: 'Payment History', icon: '📜' },
             { path: '/report-leakage', label: 'Report Leakage', icon: '🚰' },
         ];
     }

@@ -16,6 +16,7 @@ import TechnicianDashboard from './pages/TechnicianDashboard';
 import AdminLeakageReports from './pages/AdminLeakageReports';
 import ReportLeakage from './pages/ReportLeakage';
 import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentHistory from './pages/PaymentHistory';
 import PrivateRoute from './components/PrivateRoute';
 import SupportWidget from './components/SupportWidget';
 import DemoOCR from './pages/DemoOCR';
@@ -65,6 +66,11 @@ function App() {
                 <Route path="/bills" element={
                     <PrivateRoute>
                         <Bills />
+                    </PrivateRoute>
+                } />
+                <Route path="/payment-history" element={
+                    <PrivateRoute>
+                        <PaymentHistory />
                     </PrivateRoute>
                 } />
                 <Route path="/payment/callback" element={
