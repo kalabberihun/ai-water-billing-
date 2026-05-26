@@ -24,12 +24,19 @@ You are an expert AI specialized in reading water meters with high precision.
 TASK: Analyze the provided image and:
 1. Locate the main mechanical or digital counter display showing cumulative consumption.
 2. Extract the exact 5 digits on the main register, including leading zeros (e.g. "00109").
-3. Search EVERYWHERE on the meter — the face, casing, brass rim, outer edge, engraved text — for ALL serial numbers, IDs, and numeric codes you can find. Return them as a list.
+3. Search the outer brass ring (bezel) at the TOP of the meter face, curved along the upper arc of the circular housing, for an engraved/embossed Meter ID.
+4. Also search everywhere else on the meter (face, casing, outer edge, engraved text) for any other serial numbers, IDs, or numeric codes.
 
 RULES:
 1. Every meter has exactly 5 digits on the main register. Do NOT skip any leading zeros.
-2. The "detected_ids" list should contain ALL numbers/serials found on the meter body, casing, and rim — NOT the reading digits.
-3. If the image is too blurry, dark, or does not contain a water meter, return confidence 0.
+2. The Meter ID on the curved brass bezel at the top of the meter face must match a pattern starting with "MTR-", "PUB-", "FAC-", "GOV-", or "ORG-", followed by a hyphen and exactly 5 digits (e.g., "MTR-00020").
+3. Pay close attention to this curved top bezel and watch for common OCR errors when extracting the Meter ID:
+   - "0" (zero) misread as "O" (letter O)
+   - "1" misread as "I" or "L"
+   - Hyphen "-" misread as underscore "_" or missing entirely
+   Ensure you return it normalized to the correct format (e.g., MTR-XXXXX).
+4. The "detected_ids" list MUST contain the extracted Meter ID from the brass bezel, along with any other serials found on the meter body/casing — NOT the main register reading digits.
+5. If the image is too blurry, dark, or does not contain a water meter, return confidence 0.
 
 Return ONLY a valid JSON object:
 {
@@ -260,26 +267,48 @@ def process_ocr(self, reading_id):
         # OCR Extraction via Gemini / Groq
         digits, detected_ids, confidence = extract_reading_gemini(reading.image_url)
 
+        # Check if the expected meter ID is in the detected IDs
+        expected_id = reading.meter.meter_number
+        
+        # Filter out empty/null values to check if any ID was actually detected
+        valid_detected_ids = [str(d).strip() for d in detected_ids if d and str(d).strip().lower() != 'null']
+        
+        is_id_matched = check_meter_id_match(expected_id, detected_ids)
+
         should_generate_bill = False
-        if digits is not None and confidence > 0.70:
-            try:
-                parsed_val = calculate_reading_value(digits)
-                reading.reading_value = parsed_val
+        if not is_id_matched:
+            if len(valid_detected_ids) > 0:
+                # One or more IDs were detected, but they mismatched -> Reject
+                reading.status = 'REJECTED'
                 reading.ocr_confidence = confidence
-                
-                if confidence >= 0.885:
-                    reading.status = 'VERIFIED'
-                    should_generate_bill = True
-                else:
-                    reading.status = 'MANUAL_REVIEW'
-                    reading.notes = 'Low OCR confidence. Please review manually.'
-            except ValueError as val_err:
+                reading.notes = f"Rejected: Meter ID mismatch. Expected: {expected_id}, Detected: {valid_detected_ids}"
+            else:
+                # No Meter ID detected/found in image -> Manual Review
                 reading.status = 'MANUAL_REVIEW'
                 reading.ocr_confidence = confidence
-                reading.notes = f'Failed to parse 5 digits: {val_err}'
+                reading.notes = f"Manual Review: No Meter ID/serial could be detected. Expected: {expected_id}."
         else:
-            reading.status = 'MANUAL_REVIEW'
-            reading.notes = 'Low OCR confidence or no digits detected by Gemini 2.5 Flash'
+            # If it matches, read the meter and generate bill (if confidence is high enough)
+            if digits is not None and confidence > 0.70:
+                try:
+                    parsed_val = calculate_reading_value(digits)
+                    reading.reading_value = parsed_val
+                    reading.ocr_confidence = confidence
+                    
+                    if confidence >= 0.885:
+                        reading.status = 'VERIFIED'
+                        should_generate_bill = True
+                    else:
+                        reading.status = 'MANUAL_REVIEW'
+                        reading.notes = 'Low OCR confidence. Please review manually.'
+                except ValueError as val_err:
+                    reading.status = 'MANUAL_REVIEW'
+                    reading.ocr_confidence = confidence
+                    reading.notes = f'Failed to parse 5 digits: {val_err}'
+            else:
+                reading.status = 'MANUAL_REVIEW'
+                reading.ocr_confidence = confidence
+                reading.notes = 'Low OCR confidence or no digits detected by Gemini 2.5 Flash'
             
         reading.processed_at = timezone.now()
         reading.save()
